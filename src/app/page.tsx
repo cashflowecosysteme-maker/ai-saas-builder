@@ -6,6 +6,8 @@ import { FloatingOrbs, FloatingParticles } from "@/components/premium-animations
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   ArrowRight,
   Sparkles,
@@ -23,7 +25,100 @@ import {
   Settings,
   Crown,
   Heart,
+  Loader2,
 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+
+function SignupForm() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'inscription')
+      }
+
+      toast.success('Compte créé ! Redirection...')
+      window.location.href = '/dashboard'
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="w-full max-w-sm mx-auto space-y-3">
+      <div className="space-y-2">
+        <Input
+          type="text"
+          placeholder="Ton prénom"
+          value={formData.fullName}
+          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+          required
+          className="h-11 bg-white/10 border-purple-500/30 text-white placeholder:text-zinc-500 focus:border-purple-500 text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        <Input
+          type="email"
+          placeholder="Ton email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+          className="h-11 bg-white/10 border-purple-500/30 text-white placeholder:text-zinc-500 focus:border-purple-500 text-sm"
+        />
+      </div>
+      <div className="space-y-2">
+        <Input
+          type="password"
+          placeholder="Mot de passe (6+ caractères)"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          required
+          minLength={6}
+          className="h-11 bg-white/10 border-purple-500/30 text-white placeholder:text-zinc-500 focus:border-purple-500 text-sm"
+        />
+      </div>
+      <Button 
+        type="submit" 
+        disabled={isLoading}
+        className="w-full glass-button text-white border-0 h-11 text-sm font-medium"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Création...
+          </>
+        ) : (
+          <>
+            🚀 Créer mon compte gratuit
+          </>
+        )}
+      </Button>
+      <p className="text-xs text-zinc-500 text-center">
+        Essai gratuit 7 jours • Aucune CB requise
+      </p>
+    </form>
+  )
+}
 
 export default function Home() {
   return (
@@ -184,12 +279,7 @@ export default function Home() {
           </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Link href="/signup">
-              <Button size="lg" className="glass-button text-white border-0 px-8 py-6 text-lg group">
-                Essai gratuit (7 jours)
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
+            <SignupForm />
           </div>
         </div>
       </section>
