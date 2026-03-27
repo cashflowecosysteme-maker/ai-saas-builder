@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { StarryBackground } from "@/components/starry-background";
+import { LogoSlider } from "@/components/logo-slider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,6 +147,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Logo Slider - Trust Section */}
+      <LogoSlider />
 
       {/* Features Section */}
       <section id="features" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
