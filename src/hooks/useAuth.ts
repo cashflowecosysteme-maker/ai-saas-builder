@@ -11,28 +11,41 @@ export function useAuth() {
   const logout = async () => {
     setIsLoggingOut(true)
     try {
-      const response = await fetch('/api/auth/logout', {
+      // Call logout API
+      await fetch('/api/auth/logout', {
         method: 'POST',
       })
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la déconnexion')
+      // Clear all storage
+      if (typeof window !== 'undefined') {
+        localStorage.clear()
+        sessionStorage.clear()
+
+        // Clear all cookies by setting them to expire in the past
+        document.cookie.split(';').forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, '')
+            .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/')
+        })
       }
 
       toast.success('Déconnexion réussie')
 
-      // Clear any local storage
+      // Force hard redirect to login page
+      window.location.href = '/login'
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Even if API fails, clear local and redirect
       if (typeof window !== 'undefined') {
         localStorage.clear()
         sessionStorage.clear()
+        document.cookie.split(';').forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, '')
+            .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/')
+        })
       }
-
-      // Redirect to home page
-      router.push('/')
-      router.refresh()
-    } catch (error) {
-      console.error('Logout error:', error)
-      toast.error('Erreur lors de la déconnexion')
+      window.location.href = '/login'
     } finally {
       setIsLoggingOut(false)
     }

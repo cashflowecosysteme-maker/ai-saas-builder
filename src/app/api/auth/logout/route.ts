@@ -11,9 +11,6 @@ export const runtime = 'edge'
  */
 export async function POST(request: NextRequest) {
   try {
-    // Create response object
-    let response = NextResponse.next()
-
     // Create Supabase client with cookie handling for edge runtime
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,52 +21,81 @@ export async function POST(request: NextRequest) {
             return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              request.cookies.set(name, value)
-              response.cookies.set(name, value, options)
-            })
+            // We don't need to set cookies on logout, just clear them
           },
         },
       }
     )
 
-    const { error } = await supabase.auth.signOut()
+    // Sign out from Supabase
+    await supabase.auth.signOut()
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
+    // Create response
+    const response = NextResponse.json({ success: true })
 
-    // Return success and clear cookies
-    const successResponse = NextResponse.json({ success: true })
+    // Get all cookies and clear them
+    const allCookies = request.cookies.getAll()
 
-    // Clear auth cookies
-    const authCookies = [
-      'sb-access-token',
-      'sb-refresh-token',
-      'sb-fttmwpqzvadndqbfyhot-auth-token',
-      'sb-fttmwpqzvadndqbfyhot-auth-token.0',
-      'sb-fttmwpqzvadndqbfyhot-auth-token.1',
-    ]
-
-    authCookies.forEach((name) => {
-      successResponse.cookies.set(name, '', {
+    allCookies.forEach((cookie) => {
+      // Clear each cookie
+      response.cookies.set(cookie.name, '', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true,
         sameSite: 'lax',
         path: '/',
         maxAge: 0,
+        expires: new Date(0),
       })
     })
 
-    return successResponse
+    // Also clear known Supabase cookie patterns
+    const supabaseCookiePatterns = [
+      'sb-access-token',
+      'sb-refresh-token',
+    ]
+
+    // Add project-specific cookies
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0]
+    if (projectRef) {
+      supabaseCookiePatterns.push(
+        `sb-${projectRef}-auth-token`,
+        `sb-${projectRef}-auth-token.0`,
+        `sb-${projectRef}-auth-token.1`,
+        `sb-${projectRef}-auth-token.2`,
+        `sb-${projectRef}-auth-token.3`,
+      )
+    }
+
+    supabaseCookiePatterns.forEach((name) => {
+      response.cookies.set(name, '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+        expires: new Date(0),
+      })
+    })
+
+    return response
   } catch (error) {
     console.error('Logout error:', error)
-    return NextResponse.json(
-      { error: 'Erreur serveur' },
-      { status: 500 }
-    )
+    // Still return success to allow client-side cleanup
+    const response = NextResponse.json({ success: true })
+
+    // Clear all cookies even on error
+    const allCookies = request.cookies.getAll()
+    allCookies.forEach((cookie) => {
+      response.cookies.set(cookie.name, '', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 0,
+        expires: new Date(0),
+      })
+    })
+
+    return response
   }
 }
