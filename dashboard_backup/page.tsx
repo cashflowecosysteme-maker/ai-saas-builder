@@ -1,10 +1,21 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { StarryBackground } from '@/components/starry-background'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   TrendingUp,
   Users,
@@ -12,22 +23,88 @@ import {
   Link2,
   Copy,
   Check,
+  LogOut,
+  User,
+  Settings,
   Sparkles,
+  ChevronDown,
   Eye,
   MousePointer,
   ShoppingCart,
 } from 'lucide-react'
-import { useState } from 'react'
+
+interface User {
+  id: string
+  email: string
+  user_metadata: {
+    full_name?: string
+    referral_code?: string
+  }
+}
+
+interface Stats {
+  totalEarnings: number
+  pendingCommissions: number
+  totalReferrals: number
+  clicks: number
+  conversions: number
+}
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [stats, setStats] = useState<Stats>({
+    totalEarnings: 0,
+    pendingCommissions: 0,
+    totalReferrals: 0,
+    clicks: 0,
+    conversions: 0,
+  })
+  const router = useRouter()
+  const supabase = createClient()
 
-  const referralLink = 'https://affiliationpro.publication-web.com/r/DEMO123'
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      setUser(user as User)
+      setLoading(false)
+    }
+
+    getUser()
+  }, [router, supabase.auth])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const referralLink = user?.user_metadata?.referral_code
+    ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://affiliationpro.publication-web.com'}/r/${user.user_metadata.referral_code}`
+    : ''
 
   const copyLink = () => {
     navigator.clipboard.writeText(referralLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (loading) {
+    return (
+      <div className="relative min-h-screen flex items-center justify-center">
+        <StarryBackground />
+        <div className="relative z-10 text-center">
+          <Sparkles className="w-8 h-8 text-purple-400 animate-pulse mx-auto mb-4" />
+          <p className="text-zinc-400">Chargement...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -43,11 +120,28 @@ export default function DashboardPage() {
           <span className="font-bold gradient-text">Affiliation Pro</span>
         </div>
 
-        <Link href="/login">
-          <Button variant="ghost" className="text-zinc-300 hover:text-white">
-            Déconnexion
-          </Button>
-        </Link>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="text-zinc-300 hover:text-white hover:bg-white/5 flex items-center px-4 py-2 rounded-md">
+            <User className="w-4 h-4 mr-2" />
+            {user?.user_metadata?.full_name || user?.email}
+            <ChevronDown className="w-4 h-4 ml-2" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="glass-card border-purple-500/20">
+            <DropdownMenuLabel className="text-white">Mon compte</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-purple-500/20" />
+            <DropdownMenuItem className="text-zinc-300 focus:text-white focus:bg-purple-500/10">
+              <Settings className="w-4 h-4 mr-2" />
+              Paramètres
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="text-red-400 focus:text-red-300 focus:bg-red-500/10"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Déconnexion
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {/* Main Content */}
@@ -56,7 +150,7 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">
-              Bienvenue, Affilié Demo 👋
+              Bienvenue, {user?.user_metadata?.full_name || 'Affilié'} 👋
             </h1>
             <p className="text-zinc-400">
               Voici un aperçu de vos performances d'affiliation
@@ -94,7 +188,7 @@ export default function DashboardPage() {
                   </Badge>
                 </div>
                 <p className="text-zinc-400 text-sm mb-1">Gains totaux</p>
-                <p className="text-2xl font-bold text-white">€0.00</p>
+                <p className="text-2xl font-bold text-white">€{stats.totalEarnings.toFixed(2)}</p>
               </CardContent>
             </Card>
 
@@ -107,7 +201,7 @@ export default function DashboardPage() {
                   </Badge>
                 </div>
                 <p className="text-zinc-400 text-sm mb-1">Commissions en attente</p>
-                <p className="text-2xl font-bold text-white">€0.00</p>
+                <p className="text-2xl font-bold text-white">€{stats.pendingCommissions.toFixed(2)}</p>
               </CardContent>
             </Card>
 
@@ -117,7 +211,7 @@ export default function DashboardPage() {
                   <Users className="w-8 h-8 text-blue-500" />
                 </div>
                 <p className="text-zinc-400 text-sm mb-1">Total referrals</p>
-                <p className="text-2xl font-bold text-white">0</p>
+                <p className="text-2xl font-bold text-white">{stats.totalReferrals}</p>
               </CardContent>
             </Card>
 
@@ -127,7 +221,7 @@ export default function DashboardPage() {
                   <ShoppingCart className="w-8 h-8 text-orange-500" />
                 </div>
                 <p className="text-zinc-400 text-sm mb-1">Conversions</p>
-                <p className="text-2xl font-bold text-white">0</p>
+                <p className="text-2xl font-bold text-white">{stats.conversions}</p>
               </CardContent>
             </Card>
           </div>

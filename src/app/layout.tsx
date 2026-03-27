@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Affiliation Pro - Programme d'Affiliation 3 Niveaux",
-  description: "La plateforme d'affiliation premium avec commissions sur 3 niveaux. Gagnez 25% + 10% + 5% sur chaque vente. Intégration Systeme.io incluse.",
-  keywords: ["affiliation", "marketing", "commission", "revenus passifs", "systeme.io", "3 niveaux"],
-  authors: [{ name: "Affiliation Pro" }],
+  title: "AffiliationPro - Ton Programme d'Affiliation en 5 Minutes",
+  description: "Alternative à l'affiliation Systeme.io. Crée ton programme d'affiliation avec 3 niveaux de commissions (25%, 10%, 5%), dashboard complet et automatisation totale.",
+  keywords: ["affiliation", "marketing", "commission", "systeme.io", "3 niveaux", "programme affilié", "automatisation"],
+  authors: [{ name: "Publication-Web Cashflow" }],
   openGraph: {
-    title: "Affiliation Pro - Programme d'Affiliation 3 Niveaux",
-    description: "La plateforme d'affiliation premium avec commissions sur 3 niveaux.",
+    title: "AffiliationPro - Ton Programme d'Affiliation en 5 Minutes",
+    description: "Alternative à l'affiliation Systeme.io. Crée ton programme avec 3 niveaux de commissions.",
     type: "website",
     locale: "fr_FR",
   },

@@ -33,6 +33,16 @@ interface SystemeWebhookEvent {
   timestamp: string
 }
 
+interface Affiliate {
+  id: string
+  user_id: string
+  parent_id: string | null
+  level: number
+  commission_rate: number
+  total_earnings: number
+  total_referrals: number
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: SystemeWebhookEvent = await request.json()
@@ -166,13 +176,15 @@ async function handleContactCreated(event: SystemeWebhookEvent) {
 }
 
 // Placeholder functions - these would use Supabase in production
-async function findAffiliateByCode(code: string) {
+async function findAffiliateByCode(code: string): Promise<Affiliate | null> {
   // TODO: Query Supabase for affiliate by referral_code
+  console.log('Finding affiliate by code:', code)
   return null
 }
 
-async function findAffiliateById(id: string) {
+async function findAffiliateById(id: string): Promise<Affiliate | null> {
   // TODO: Query Supabase for affiliate by id
+  console.log('Finding affiliate by id:', id)
   return null
 }
 
@@ -183,7 +195,7 @@ async function createCommission(data: {
   level: number
   source: string
   metadata: any
-}) {
+}): Promise<void> {
   // TODO: Insert commission into Supabase
   console.log('Creating commission:', data)
 }

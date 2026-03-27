@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { StarryBackground } from "@/components/starry-background";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,13 @@ import {
   Gift,
   ChevronRight,
   Check,
+  BarChart3,
+  Link2,
+  Mail,
+  LayoutDashboard,
+  Settings,
+  Crown,
+  Heart,
 } from "lucide-react";
 
 export default function Home() {
@@ -26,7 +34,7 @@ export default function Home() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold gradient-text">Affiliation Pro</span>
+          <span className="text-xl font-bold gradient-text">AffiliationPro</span>
         </div>
         <div className="hidden md:flex items-center gap-8">
           <Link href="#features" className="text-zinc-400 hover:text-white transition-colors">
@@ -34,9 +42,6 @@ export default function Home() {
           </Link>
           <Link href="#pricing" className="text-zinc-400 hover:text-white transition-colors">
             Tarifs
-          </Link>
-          <Link href="#faq" className="text-zinc-400 hover:text-white transition-colors">
-            FAQ
           </Link>
         </div>
         <div className="flex items-center gap-4">
@@ -47,7 +52,7 @@ export default function Home() {
           </Link>
           <Link href="/signup">
             <Button className="glass-button text-white border-0">
-              Démarrer gratuit
+              Essai gratuit
             </Button>
           </Link>
         </div>
@@ -57,62 +62,85 @@ export default function Home() {
       <section className="relative z-10 px-6 pt-16 pb-24 md:px-12 lg:px-24">
         <div className="max-w-6xl mx-auto text-center">
           <Badge className="mb-6 glass-button border-purple-500/30 text-purple-300">
-            <Sparkles className="w-3 h-3 mr-1" />
-            Nouveau: Intégration Systeme.io
+            🚀 Alternative à l'affiliation Systeme.io
           </Badge>
           
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-            <span className="text-white">Programme d'Affiliation</span>
+            <span className="text-white">Ton programme d'affiliation</span>
             <br />
-            <span className="gradient-text">3 Niveaux de Commissions</span>
+            <span className="gradient-text">prêt en 5 minutes</span>
           </h1>
           
-          <p className="text-lg md:text-xl text-zinc-400 mb-8 max-w-2xl mx-auto">
-            La plateforme premium qui remplace l'affiliation Systeme.io. 
-            Gagnez <span className="text-purple-400 font-semibold">25%</span> + 
-            <span className="text-blue-400 font-semibold"> 10%</span> + 
-            <span className="text-green-400 font-semibold"> 5%</span> sur 3 niveaux.
+          <p className="text-lg md:text-xl text-zinc-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+            Tu utilises Systeme.io ? Leur système d'affiliation a fermé ? 
+            <span className="text-purple-400 font-semibold"> Crée ton propre programme d'affiliation avec 3 niveaux de commissions, dashboard complet et automatisation totale.</span>
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Link href="/signup">
               <Button size="lg" className="glass-button text-white border-0 px-8 py-6 text-lg group">
-                Commencer gratuitement
+                Essai gratuit (7 jours)
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Link href="#demo">
-              <Button size="lg" variant="outline" className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10">
-                Voir la démo
-              </Button>
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
-            {[
-              { value: "2,847+", label: "Affiliés actifs" },
-              { value: "€127K", label: "Commissions versées" },
-              { value: "99.9%", label: "Uptime garanti" },
-            ].map((stat, i) => (
-              <div key={i} className="glass-card rounded-2xl p-4">
-                <div className="text-2xl md:text-3xl font-bold gradient-text">{stat.value}</div>
-                <div className="text-sm text-zinc-400">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
+      </section>
 
-        {/* Hero Visual */}
-        <div className="max-w-5xl mx-auto mt-16">
-          <div className="glass-card rounded-3xl p-2 glow-purple">
-            <div className="bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-2xl p-8 min-h-[400px] flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center pulse-glow">
-                  <TrendingUp className="w-12 h-12 text-white" />
+      {/* Done For You Section */}
+      <section className="relative z-10 px-6 py-12 md:px-12 lg:px-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-green-500/30 bg-gradient-to-br from-green-500/5 via-transparent to-emerald-500/5">
+            <div className="flex flex-col lg:flex-row items-center gap-8">
+              {/* Image */}
+              <div className="w-full lg:w-1/2 flex justify-center">
+                <div className="relative w-full max-w-md aspect-[3/2] rounded-2xl overflow-hidden border-2 border-green-500/20 shadow-2xl shadow-green-500/10">
+                  <Image
+                    src="/heureuse.png"
+                    alt="Femme heureuse - Done For You"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-purple-900/30 to-transparent" />
                 </div>
-                <p className="text-xl text-zinc-300">Dashboard Preview</p>
-                <p className="text-sm text-zinc-500 mt-2">Interface premium en cours de chargement...</p>
+              </div>
+              
+              {/* Content */}
+              <div className="w-full lg:w-1/2 text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30">
+                  <Crown className="w-5 h-5 text-green-400" />
+                  <span className="text-green-300 font-semibold">100% Done For You</span>
+                </div>
+                
+                <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                  <span className="text-green-400">Zéro Technique.</span>
+                  <br />
+                  <span className="text-green-400">Zéro Effort.</span>
+                  <br />
+                  <span className="gradient-text">Zéro Stress.</span>
+                </h2>
+                
+                <p className="text-zinc-300 text-lg mb-6 leading-relaxed">
+                  Tu paies. Tu cliques. <span className="text-green-400 font-semibold">L'IA fait tout le reste</span> pendant que tu profites de ta vie.
+                </p>
+                
+                <div className="space-y-3 mb-6">
+                  {[
+                    "Ton employé numérique 24h/24 et 7j/7",
+                    "L'IA travaille pendant que tu dors",
+                    "Tu te réveilles avec des résultats",
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3 justify-center lg:justify-start">
+                      <Heart className="w-5 h-5 text-pink-400 fill-pink-400" />
+                      <span className="text-zinc-300">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <p className="text-zinc-400 text-sm italic">
+                  "Je paie, je clic, c'est fait. Je ne réfléchis plus." ✨
+                </p>
               </div>
             </div>
           </div>
@@ -124,53 +152,59 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Pourquoi choisir <span className="gradient-text">Affiliation Pro</span> ?
+              ✨ Tout ce dont tu as besoin
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto">
-              La solution complète pour les entrepreneurs qui veulent maximiser leurs revenus d'affiliation.
+              Une solution complète pour gérer ton programme d'affiliation
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                icon: Gift,
+                icon: BarChart3,
                 title: "3 Niveaux de Commissions",
-                description: "25% au niveau 1, 10% au niveau 2, 5% au niveau 3. Gagnez sur les ventes de vos filleuls et leurs filleuls.",
+                description: "Niveau 1 : 25% • Niveau 2 : 10% • Niveau 3 : 5% (ou personnalise selon tes besoins). Motive tes affiliés à recruter d'autres affiliés !",
+                color: "text-purple-400",
               },
               {
-                icon: Zap,
+                icon: Link2,
                 title: "Intégration Systeme.io",
-                description: "Connectez votre compte Systeme.io en un clic. Webhooks automatiques pour le tracking des ventes.",
+                description: "Connecte ton compte Systeme.io en 1 clic. Chaque vente est automatiquement trackée et les commissions calculées.",
+                color: "text-blue-400",
               },
               {
-                icon: Users,
-                title: "Programme Ambassadeur",
-                description: "Devenez ambassadeur et touchez des commissions récurrentes chaque mois sur vos referrals.",
+                icon: LayoutDashboard,
+                title: "Page d'Inscription Pro",
+                description: "Une page d'inscription personnalisée pour recruter tes affiliés automatiquement. Ton branding, ton style.",
+                color: "text-green-400",
               },
               {
                 icon: TrendingUp,
-                title: "Analytics Avancés",
-                description: "Suivez vos performances en temps réel. Visualisez vos gains, clics, conversions et tendances.",
+                title: "Dashboard Affiliés",
+                description: "Tes affiliés voient leurs ventes, leur équipe, leurs gains, leurs liens personnalisés. Tout est clair et motivant.",
+                color: "text-orange-400",
               },
               {
-                icon: Shield,
-                title: "Paiements Sécurisés",
-                description: "Retraits automatiques vers PayPal ou virement bancaire. Transactions cryptées et sécurisées.",
+                icon: Settings,
+                title: "Dashboard Admin",
+                description: "Gère tes affiliés, visualise les statistiques, exporte les données, effectue les paiements en quelques clics.",
+                color: "text-pink-400",
               },
               {
-                icon: Sparkles,
-                title: "IA Intégrée",
-                description: "Assistant IA pour générer vos contenus promotionnels, emails et pages de vente optimisées.",
+                icon: Mail,
+                title: "Emails Automatiques",
+                description: "Bienvenue aux affiliés, notification de vente, récapitulatif mensuel... Tout est automatisé.",
+                color: "text-cyan-400",
               },
             ].map((feature, i) => (
               <Card key={i} className="glass-card glass-card-hover border-0">
                 <CardContent className="p-6">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center mb-4">
-                    <feature.icon className="w-6 h-6 text-purple-400" />
+                    <feature.icon className={`w-6 h-6 ${feature.color}`} />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-zinc-400 text-sm">{feature.description}</p>
+                  <p className="text-zinc-400 text-sm leading-relaxed">{feature.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -183,33 +217,36 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Comment ça <span className="gradient-text">fonctionne</span> ?
+              🚀 Comment ça <span className="gradient-text">marche</span> ?
             </h2>
+            <p className="text-zinc-400">En 3 étapes simples, ton programme est prêt</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                step: "01",
-                title: "Créez votre compte",
-                description: "Inscription gratuite en 30 secondes. Vous recevez immédiatement votre lien d'affiliation unique.",
+                step: "1",
+                title: "Crée ton compte",
+                description: "Inscription gratuite en 30 secondes. Tu configures ton programme : nom, logo, pourcentages de commissions.",
               },
               {
-                step: "02",
-                title: "Partagez votre lien",
-                description: "Partagez votre lien sur vos réseaux, blog, email. Notre IA peut générer du contenu pour vous.",
+                step: "2",
+                title: "Connecte Systeme.io",
+                description: "Tu colles ton webhook Systeme.io et c'est tout ! Les ventes sont automatiquement trackées.",
               },
               {
-                step: "03",
-                title: "Gagnez des commissions",
-                description: "Recevez 25% sur chaque vente + 10% sur les filleuls de niveau 2 + 5% sur le niveau 3.",
+                step: "3",
+                title: "Recrute tes affiliés",
+                description: "Partage ta page d'inscription. Tes affiliés s'inscrivent, reçoivent leurs liens et commencent à vendre pour toi !",
               },
             ].map((item, i) => (
               <div key={i} className="relative">
                 <div className="glass-card rounded-2xl p-6 h-full">
-                  <div className="text-4xl font-bold gradient-text mb-4">{item.step}</div>
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center mb-4 text-white font-bold text-xl">
+                    {item.step}
+                  </div>
                   <h3 className="text-xl font-semibold text-white mb-2">{item.title}</h3>
-                  <p className="text-zinc-400">{item.description}</p>
+                  <p className="text-zinc-400 leading-relaxed">{item.description}</p>
                 </div>
                 {i < 2 && (
                   <ChevronRight className="hidden md:block absolute top-1/2 -right-6 w-8 h-8 text-purple-500/50 transform -translate-y-1/2" />
@@ -222,47 +259,154 @@ export default function Home() {
 
       {/* Pricing */}
       <section id="pricing" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Tarification <span className="gradient-text">simple</span>
+              <span className="gradient-text">39 $</span> par mois
             </h2>
-            <p className="text-zinc-400">Un seul plan. Toutes les fonctionnalités. Sans surprise.</p>
+            <p className="text-zinc-400">Pour les entreprises en croissance</p>
           </div>
 
-          <div className="glass-card rounded-3xl p-8 glow-purple">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+          <Card className="glass-card rounded-3xl p-8 glow-purple">
+            <CardContent className="p-0">
+              <ul className="space-y-4 mb-8">
+                {[
+                  "3 niveaux de commissions",
+                  "Affiliés illimités",
+                  "Marque blanche",
+                  "Dashboard ultra-complet",
+                  "API + Webhooks multiples",
+                  "Emails avancés",
+                  "Support prioritaire",
+                ].map((feature, i) => (
+                  <li key={i} className="flex items-center gap-3 text-zinc-300">
+                    <Check className="w-5 h-5 text-green-500 shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              
+              <Link href="/signup" className="block">
+                <Button size="lg" className="w-full glass-button text-white border-0 py-6 text-lg group">
+                  Démarrer maintenant
+                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* PublicationCashflow - Flagship Product */}
+      <section className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-transparent to-purple-500/5">
+            <Badge className="mb-4 bg-amber-500/20 text-amber-300 border-amber-500/30">
+              👑 Notre Solution Premium
+            </Badge>
+            
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              <span className="text-amber-400">PublicationCashflow</span>
+            </h2>
+            
+            <p className="text-xl text-zinc-200 mb-4 font-medium">
+              L'IA crée ton site d'affiliation en <span className="text-amber-400">60 secondes</span>.
+            </p>
+            
+            <p className="text-zinc-400 mb-6 text-lg">
+              Puis elle publie <span className="text-white font-semibold">automatiquement du contenu 24h/24 et 7j/7</span>...
+            </p>
+            
+            {/* Done For You Banner */}
+            <div className="mb-8 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-center">
+              <p className="text-green-400 font-semibold text-lg mb-1">
+                ✨ 100% Done For You — Zéro Technique, Zéro Stress
+              </p>
+              <p className="text-zinc-400 text-sm">
+                Tu paies. Tu cliques. L'IA fait tout le reste pendant que tu profites de ta vie.
+              </p>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {[
+                { icon: "⚡", text: "Génération en 60 sec" },
+                { icon: "🤖", text: "Contenu automatisé 24/7" },
+                { icon: "📘", text: "Intégration Facebook..." },
+                { icon: "📅", text: "Et bien plus encore..." },
+              ].map((item, i) => (
+                <div key={i} className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <p className="text-zinc-300 text-sm">{item.text}</p>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
               <div>
-                <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
-                  Populaire
-                </Badge>
-                <h3 className="text-2xl font-bold text-white mb-2">Affiliation Pro</h3>
-                <p className="text-zinc-400 mb-6">Accès complet à toutes les fonctionnalités</p>
-                <ul className="space-y-3">
-                  {[
-                    "Programme 3 niveaux illimité",
-                    "Intégration Systeme.io",
-                    "Analytics en temps réel",
-                    "Assistant IA inclus",
-                    "Support prioritaire",
-                    "Paiements automatiques",
-                  ].map((feature, i) => (
-                    <li key={i} className="flex items-center gap-2 text-zinc-300">
-                      <Check className="w-5 h-5 text-green-500" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-zinc-300 text-lg font-medium">Découvre ce que l'IA peut faire pour toi...</p>
+                <p className="text-amber-400 text-sm">👉 Ton employé numérique qui travaille pendant que tu dors...</p>
               </div>
-              <div className="text-center md:text-right">
-                <div className="text-5xl font-bold gradient-text mb-2">39€</div>
-                <div className="text-zinc-400 mb-6">/mois</div>
-                <Link href="/signup">
-                  <Button size="lg" className="glass-button text-white border-0 px-8">
-                    Commencer maintenant
-                  </Button>
-                </Link>
-                <p className="text-xs text-zinc-500 mt-4">Essai gratuit 14 jours • Sans engagement</p>
+              <a href="https://www.publicationcashflow.com/" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 group">
+                  Voir la démo
+                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Coming Soon - Création Sites IA */}
+      <section className="relative z-10 px-6 py-24 md:px-12 lg:px-24 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-purple-500/30">
+            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+              🚀 Bientôt disponible
+            </Badge>
+            
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Création de <span className="gradient-text">Sites IA Premium</span>
+            </h2>
+            
+            <p className="text-zinc-300 mb-6 text-lg">
+              Tu connais notre <span className="text-purple-400 font-semibold">Générateur d'affiliation</span> ?
+              On pousse le concept encore plus loin !
+            </p>
+            
+            <p className="text-zinc-400 mb-8">
+              <span className="text-white font-medium">Mini-sites premium</span> pour coachs, thérapeutes, freelancers, ambassadeurs, 
+              numérologues, astrologues, et tous les entrepreneurs du bien-être...
+            </p>
+            
+            <div className="grid sm:grid-cols-2 gap-4 mb-8">
+              {[
+                "🎨 10+ templates professionnels",
+                "🤖 Génération IA illimitée",
+                "🔗 Sous-domaine inclus",
+                "📱 Carte numérique d'affaire",
+                "💼 Portfolio & services",
+                "📅 Prise de rendez-vous",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-zinc-300">
+                  <Check className="w-4 h-4 text-green-400 shrink-0" />
+                  <span>{item.substring(2)}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+              <div>
+                <p className="text-zinc-400 text-sm">Prix de lancement</p>
+                <p className="text-4xl font-bold gradient-text">69 <span className="text-xl">$</span></p>
+                <p className="text-zinc-500 text-sm">par mois</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full sm:w-auto">
+                <Button size="lg" className="glass-button text-white border-0 group">
+                  🔔 Rejoindre la liste d'attente
+                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <p className="text-xs text-zinc-500 text-center">Sois informé(e) en premier !</p>
               </div>
             </div>
           </div>
@@ -273,16 +417,16 @@ export default function Home() {
       <section className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-4xl mx-auto text-center">
           <div className="glass-card rounded-3xl p-12">
-            <Sparkles className="w-12 h-12 text-purple-400 mx-auto mb-6" />
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Prêt à rejoindre les <span className="gradient-text">Affiliés Pro</span> ?
+              💜 Prêt(e) à lancer ton <span className="gradient-text">programme d'affiliation</span> ?
             </h2>
             <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
-              Rejoignez les milliers d'entrepreneurs qui génèrent des revenus passifs avec notre programme d'affiliation 3 niveaux.
+              Rejoins les entrepreneurs qui utilisent AffiliationPro pour automatiser leurs ventes. 
+              Essai gratuit de 14 jours, sans carte de crédit.
             </p>
             <Link href="/signup">
               <Button size="lg" className="glass-button text-white border-0 px-12 py-6 text-lg group">
-                Créer mon compte gratuit
+                🚀 Démarrer mon essai gratuit
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
@@ -291,24 +435,11 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 px-6 py-12 md:px-12 lg:px-24 border-t border-purple-500/10">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-white">Affiliation Pro</span>
-            </div>
-            <div className="flex items-center gap-6 text-sm text-zinc-400">
-              <Link href="/privacy" className="hover:text-white transition-colors">Confidentialité</Link>
-              <Link href="/terms" className="hover:text-white transition-colors">CGU</Link>
-              <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-            </div>
-            <div className="text-sm text-zinc-500">
-              © 2024 Affiliation Pro. Tous droits réservés.
-            </div>
-          </div>
+      <footer className="relative z-10 px-6 py-8 md:px-12 lg:px-24 border-t border-purple-500/10">
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-zinc-500 text-sm">
+            © 2026 AffiliationPro - Un service Publication-Web Cashflow • Visionnaire depuis 1997 ✨
+          </p>
         </div>
       </footer>
     </div>
