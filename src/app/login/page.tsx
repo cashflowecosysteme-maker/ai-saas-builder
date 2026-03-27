@@ -58,7 +58,7 @@ export default function LoginPage() {
           <div className="mt-6 text-center text-sm text-zinc-400">
             Pas encore de compte ?{' '}
             <Link href="/signup" className="text-purple-400 hover:text-purple-300 font-medium">
-              S'inscrire gratuitement
+              S&apos;inscrire gratuitement
             </Link>
           </div>
         </CardContent>
