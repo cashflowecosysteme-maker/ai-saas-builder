@@ -1,17 +1,12 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-
 export function useAuth() {
-  const router = useRouter()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
-
   const logout = () => {
-    setIsLoggingOut(true)
-    // Simply redirect to logout page which handles everything
+    // Redirect to logout page - simple and reliable
     window.location.href = '/logout'
   }
+
+  const isLoggingOut = false
 
   return { logout, isLoggingOut }
 }
