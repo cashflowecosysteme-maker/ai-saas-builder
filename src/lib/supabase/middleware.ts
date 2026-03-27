@@ -29,37 +29,21 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protected routes
-  const protectedPaths = ['/dashboard', '/account', '/affiliates', '/analytics']
+  // Only protect dashboard pages - DO NOT redirect from login/signup
+  // This allows users to logout and login with a different account
+  const protectedPaths = ['/dashboard', '/admin', '/super-admin', '/account', '/affiliates', '/analytics']
   const isProtectedPath = protectedPaths.some(path => 
     request.nextUrl.pathname.startsWith(path)
   )
 
   if (isProtectedPath && !user) {
-    // Redirect to login
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
-  }
-
-  // Redirect logged in users away from auth pages
-  const authPaths = ['/login', '/signup']
-  const isAuthPath = authPaths.some(path => 
-    request.nextUrl.pathname.startsWith(path)
-  )
-
-  if (isAuthPath && user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
