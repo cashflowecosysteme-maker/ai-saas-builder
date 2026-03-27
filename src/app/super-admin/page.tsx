@@ -48,7 +48,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-type TabType = 'dashboard' | 'admins' | 'affiliates' | 'messaging' | 'settings'
+type TabType = 'dashboard' | 'admins' | 'teams' | 'messaging' | 'settings'
 
 interface Profile {
   id: string
@@ -58,9 +58,10 @@ interface Profile {
   role: 'super_admin' | 'admin' | 'affiliate'
   paypal_email: string | null
   subdomain: string | null
-  admin_id: string | null
+  parent_id: string | null
   created_at: string
-  admin?: { full_name: string | null; email: string } | null
+  parent?: { full_name: string | null; email: string } | null
+  children?: Profile[]
   affiliates?: Array<{
     id: string
     total_earnings: number
@@ -107,7 +108,7 @@ interface SuperAdminData {
     totalPayouts: number
   }
   admins: Profile[]
-  affiliates: Profile[]
+  teams: { admin: Profile; level2: Profile[]; level3Count: number }[]
   recentSales: Sale[]
   messages: Message[]
 }
@@ -410,7 +411,7 @@ export default function SuperAdminPage() {
             {[
               { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3 },
               { id: 'admins' as TabType, label: 'Admins', icon: Building },
-              { id: 'affiliates' as TabType, label: 'Affiliés', icon: Users },
+              { id: 'teams' as TabType, label: 'Équipes', icon: Users },
               { id: 'messaging' as TabType, label: 'Messagerie', icon: MessageSquare },
               { id: 'settings' as TabType, label: 'Paramètres', icon: Settings },
             ].map((tab) => (
@@ -667,79 +668,70 @@ export default function SuperAdminPage() {
             </div>
           )}
 
-          {/* AFFILIATES TAB */}
-          {activeTab === 'affiliates' && (
+          {/* TEAMS TAB - Vue hiérarchique Admin → N2 → N3 */}
+          {activeTab === 'teams' && (
             <div className="space-y-6">
-              {/* Create Affiliate */}
-              <Card className="glass-card border-0 border-green-500/30">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-white flex items-center gap-2 text-lg">
-                    <Plus className="w-5 h-5 text-green-400" />
-                    Créer un compte Affilié
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleCreateUser} className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <Input placeholder="Nom complet" value={newUser.fullName} onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })} required className="h-10 bg-white/5 border-purple-500/20 text-white" />
-                    <Input type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required className="h-10 bg-white/5 border-purple-500/20 text-white" />
-                    <Input type="text" placeholder="Mot de passe" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required minLength={6} className="h-10 bg-white/5 border-purple-500/20 text-white" />
-                    <select value={newUser.adminId} onChange={(e) => setNewUser({ ...newUser, adminId: e.target.value })} className="h-10 rounded-md bg-white/5 border border-purple-500/20 text-white px-3">
-                      <option value="">Sélectionner un Admin</option>
-                      {data.admins.map((a) => <option key={a.id} value={a.id}>{a.full_name || a.email}</option>)}
-                    </select>
-                    <Button type="submit" disabled={isCreatingUser} className="glass-button h-10">
-                      {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-2" />Créer Affilié</>}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              {/* Search */}
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                  <Input placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white/5 border-purple-500/20 text-white" />
-                </div>
-                <Button type="submit" className="glass-button">Rechercher</Button>
-              </form>
-
-              {/* Affiliates List */}
               <Card className="glass-card border-0">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-white flex items-center gap-2 text-lg">
-                    <Users className="w-5 h-5 text-green-400" />
-                    Liste des Affiliés ({data.affiliates.length})
+                    <Users className="w-5 h-5 text-purple-400" />
+                    Vue des équipes en cascade
                   </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Admin (Client) → Niveau 2 (Affiliés directs) → Niveau 3 (Sous-affiliés)
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
-                    {data.affiliates.map((affiliate) => (
-                      <div key={affiliate.id} className="p-4 rounded-lg bg-white/5 border border-purple-500/10">
-                        <div className="flex items-start justify-between">
+                  <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-4">
+                    {data.teams.map((team) => (
+                      <div key={team.admin.id} className="rounded-xl border border-blue-500/20 overflow-hidden">
+                        {/* Admin Header */}
+                        <div className="p-4 bg-blue-500/10 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
-                              {affiliate.full_name?.[0]?.toUpperCase() || affiliate.email[0].toUpperCase()}
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold">
+                              {team.admin.full_name?.[0]?.toUpperCase() || team.admin.email[0].toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-white font-medium">{affiliate.full_name || 'Sans nom'}</p>
-                              <p className="text-zinc-400 text-sm">{affiliate.email}</p>
-                              <p className="text-zinc-500 text-xs">Code: {affiliate.affiliate_code} • Admin: {affiliate.admin?.full_name || affiliate.admin?.email || 'N/A'}</p>
+                              <p className="text-white font-semibold">{team.admin.full_name || 'Sans nom'}</p>
+                              <p className="text-zinc-400 text-sm">{team.admin.email}</p>
                             </div>
+                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                              <Building className="w-3 h-3 mr-1" />Admin
+                            </Badge>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {resetUserId === affiliate.id ? (
-                              <div className="flex items-center gap-2">
-                                <Input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau MDP" className="h-8 w-32 bg-white/5 border-purple-500/20 text-white text-sm" />
-                                <Button size="sm" className="h-8 glass-button" onClick={() => handleResetPassword(affiliate.id)}><Check className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="ghost" className="h-8" onClick={() => { setResetUserId(null); setNewPassword(''); }}><X className="w-4 h-4" /></Button>
-                              </div>
-                            ) : (
-                              <Button variant="outline" size="sm" className="h-8 border-purple-500/20 text-zinc-300" onClick={() => setResetUserId(affiliate.id)}>
-                                <Key className="w-3 h-3 mr-1" />MDP
-                              </Button>
-                            )}
+                          <div className="text-right">
+                            <p className="text-sm text-zinc-400">Niveau 2: <span className="text-white font-medium">{team.level2.length}</span></p>
+                            <p className="text-sm text-zinc-400">Niveau 3: <span className="text-white font-medium">{team.level3Count}</span></p>
                           </div>
                         </div>
+
+                        {/* Level 2 Affiliates */}
+                        {team.level2.length > 0 && (
+                          <div className="p-4 space-y-2 bg-white/5">
+                            {team.level2.map((l2) => (
+                              <div key={l2.id} className="ml-4 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-sm font-bold">
+                                    {l2.full_name?.[0]?.toUpperCase() || l2.email[0].toUpperCase()}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-white font-medium text-sm">{l2.full_name || 'Sans nom'}</p>
+                                    <p className="text-zinc-500 text-xs">{l2.email}</p>
+                                  </div>
+                                  <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/20 text-xs">
+                                    Niveau 2
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {team.level2.length === 0 && (
+                          <div className="p-4 text-center text-zinc-500 text-sm bg-white/5">
+                            Aucun affilié Niveau 2
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -772,9 +764,16 @@ export default function SuperAdminPage() {
                     {!isBroadcast && (
                       <select value={selectedRecipient} onChange={(e) => setSelectedRecipient(e.target.value)} className="w-full h-10 rounded-md bg-white/5 border border-purple-500/20 text-white px-3">
                         <option value="">Sélectionner un destinataire</option>
-                        {[...data.admins, ...data.affiliates].map((u) => (
-                          <option key={u.id} value={u.id}>{u.full_name || u.email} ({u.role})</option>
-                        ))}
+                        <optgroup label="Admins">
+                          {data.admins.map((u) => (
+                            <option key={u.id} value={u.id}>{u.full_name || u.email} (Admin)</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Affiliés">
+                          {data.teams.flatMap(t => t.level2).map((u) => (
+                            <option key={u.id} value={u.id}>{u.full_name || u.email} (N2)</option>
+                          ))}
+                        </optgroup>
                       </select>
                     )}
 

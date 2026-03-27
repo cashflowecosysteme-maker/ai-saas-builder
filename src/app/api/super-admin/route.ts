@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
 
-    // Create Supabase client with cookie handling
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -55,31 +54,40 @@ export async function GET(request: NextRequest) {
     const { data: paidData } = await admin.from('payouts').select('amount').eq('status', 'paid')
     const totalPayouts = paidData?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0
 
-    // Get admins
-    let adminsQuery = admin
+    // Get all admins
+    const { data: admins } = await admin
       .from('profiles')
-      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, created_at')
+      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at')
       .eq('role', 'admin')
       .order('created_at', { ascending: false })
 
-    if (search) {
-      adminsQuery = adminsQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%,affiliate_code.ilike.%${search}%`)
+    // Build teams structure: Admin -> Level 2 (their affiliates) -> Level 3
+    const teams = []
+    
+    for (const adminUser of (admins || [])) {
+      // Get level 2 affiliates (parent_id = admin.id)
+      const { data: level2 } = await admin
+        .from('profiles')
+        .select('id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at')
+        .eq('parent_id', adminUser.id)
+
+      // Count level 3 (affiliates of level 2)
+      let level3Count = 0
+      if (level2 && level2.length > 0) {
+        const level2Ids = level2.map((l2: any) => l2.id)
+        const { count } = await admin
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .in('parent_id', level2Ids)
+        level3Count = count || 0
+      }
+
+      teams.push({
+        admin: adminUser,
+        level2: level2 || [],
+        level3Count,
+      })
     }
-
-    const { data: admins } = await adminsQuery.limit(50)
-
-    // Get affiliates
-    let affiliatesQuery = admin
-      .from('profiles')
-      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, created_at, admin_id, admin:profiles!profiles_admin_id_fkey(full_name, email)')
-      .eq('role', 'affiliate')
-      .order('created_at', { ascending: false })
-
-    if (search) {
-      affiliatesQuery = affiliatesQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
-    }
-
-    const { data: affiliates } = await affiliatesQuery.limit(100)
 
     // Get recent sales
     const { data: recentSales } = await admin
@@ -106,7 +114,7 @@ export async function GET(request: NextRequest) {
         totalPayouts,
       },
       admins: admins || [],
-      affiliates: affiliates || [],
+      teams,
       recentSales: recentSales || [],
       messages: messages || [],
     })
