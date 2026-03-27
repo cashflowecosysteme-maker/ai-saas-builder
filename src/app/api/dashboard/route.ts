@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 // Force dynamic rendering for API routes
@@ -10,10 +10,27 @@ export const runtime = 'edge'
  * GET /api/dashboard
  * Fetch dashboard data for the authenticated affiliate
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const admin = createAdminClient() as any
+
+    // Create Supabase client with cookie handling for edge runtime
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value)
+            })
+          },
+        },
+      }
+    )
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -59,10 +59,36 @@ function SignupForm() {
       setIsSuccess(true)
       toast.success('Compte créé avec succès !')
 
-      // Redirect to dashboard after 2 seconds
-      setTimeout(() => {
-        router.push('/dashboard')
-      }, 2000)
+      // Auto-login after signup
+      try {
+        const loginResponse = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        })
+
+        if (loginResponse.ok) {
+          // Redirect to dashboard after successful login
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 1500)
+        } else {
+          // If auto-login fails, redirect to login page
+          setTimeout(() => {
+            router.push('/login?message=Compte créé! Veuillez vous connecter.')
+          }, 1500)
+        }
+      } catch {
+        // If auto-login fails, redirect to login page
+        setTimeout(() => {
+          router.push('/login?message=Compte créé! Veuillez vous connecter.')
+        }, 1500)
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'inscription')
     } finally {

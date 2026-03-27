@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { StarryBackground } from '@/components/starry-background'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Sparkles, Loader2, LogIn } from 'lucide-react'
+import { Sparkles, Loader2, LogIn, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,8 +21,17 @@ function LoginForm() {
     password: '',
   })
 
+  // Check for message (e.g., after signup)
+  const message = searchParams.get('message')
+
   // Check for redirect URL
   const redirectTo = searchParams.get('redirect') || '/dashboard'
+
+  useEffect(() => {
+    if (message) {
+      toast.success(message)
+    }
+  }, [message])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
