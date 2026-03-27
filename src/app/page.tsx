@@ -426,7 +426,7 @@ export default function Home() {
             </h2>
             <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
               Rejoins les entrepreneurs qui utilisent AffiliationPro pour automatiser leurs ventes. 
-              Essai gratuit de 14 jours, sans carte de crédit.
+              Essai gratuit de 7 jours, sans carte de crédit.
             </p>
             <Link href="/signup">
               <Button size="lg" className="glass-button text-white border-0 px-12 py-6 text-lg group">
