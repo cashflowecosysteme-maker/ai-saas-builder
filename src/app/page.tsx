@@ -143,10 +143,45 @@ export default function Home() {
             </span>
           </h1>
           
-          <p className="text-lg md:text-xl text-zinc-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Tu utilises Systeme.io ? Leur système d'affiliation a fermé ? 
-            <span className="text-purple-400 font-semibold"> Crée ton propre programme d'affiliation avec 3 niveaux de commissions, dashboard complet et automatisation totale.</span>
-          </p>
+          {/* MEGA ARGUMENT - Mise en valeur */}
+          <div className="relative max-w-4xl mx-auto mb-8">
+            {/* Glow background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-purple-500/10 to-green-500/10 blur-3xl rounded-3xl" />
+            
+            <div className="relative p-6 md:p-8 rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-blue-500/5 backdrop-blur-sm">
+              {/* Ligne 1 - Le problème */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mb-4">
+                <span className="px-4 py-1.5 rounded-full bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-medium animate-pulse">
+                  ⚠️ Systeme.io a fermé son affiliation
+                </span>
+                <span className="text-zinc-400 hidden md:block">→</span>
+                <span className="text-white font-semibold text-lg">
+                  Tu cherches une alternative ?
+                </span>
+              </div>
+              
+              {/* Ligne 2 - La solution */}
+              <div className="text-center">
+                <p className="text-xl md:text-2xl font-bold text-white mb-3">
+                  Crée ton propre programme d'affiliation
+                </p>
+                <div className="flex flex-wrap justify-center gap-3 md:gap-6">
+                  <span className="flex items-center gap-2 text-purple-400 font-semibold">
+                    <span className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center text-sm">📊</span>
+                    3 niveaux de commissions
+                  </span>
+                  <span className="flex items-center gap-2 text-blue-400 font-semibold">
+                    <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-sm">🎯</span>
+                    Dashboard complet
+                  </span>
+                  <span className="flex items-center gap-2 text-green-400 font-semibold">
+                    <span className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-sm">⚡</span>
+                    Automatisation totale
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Link href="/signup">
