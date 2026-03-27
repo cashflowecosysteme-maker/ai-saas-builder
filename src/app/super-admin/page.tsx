@@ -45,8 +45,10 @@ import {
   User,
   TrendingUp,
   Wallet,
+  LogOut,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 
 type TabType = 'dashboard' | 'admins' | 'teams' | 'messaging' | 'settings'
 
@@ -115,6 +117,7 @@ interface SuperAdminData {
 
 export default function SuperAdminPage() {
   const router = useRouter()
+  const { logout, isLoggingOut } = useAuth()
   const [data, setData] = useState<SuperAdminData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
@@ -398,9 +401,15 @@ export default function SuperAdminPage() {
           <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white" onClick={() => { setIsLoading(true); fetchData(); }}>
             <RefreshCw className="w-4 h-4 mr-2" />Actualiser
           </Button>
-          <Link href="/login">
-            <Button variant="ghost" className="text-zinc-400 hover:text-white">Déconnexion</Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            className="text-zinc-400 hover:text-white"
+            onClick={logout}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
+            Déconnexion
+          </Button>
         </div>
       </header>
 

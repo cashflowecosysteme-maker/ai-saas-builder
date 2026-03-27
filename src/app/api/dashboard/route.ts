@@ -50,7 +50,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Profil non trouvé' }, { status: 404 })
     }
 
-    // Check if user is admin
+    // Check if user is super_admin or admin - redirect accordingly
+    if (profile.role === 'super_admin') {
+      return NextResponse.json({ isSuperAdmin: true, profile })
+    }
+
     if (profile.role === 'admin') {
       return NextResponse.json({ isAdmin: true, profile })
     }

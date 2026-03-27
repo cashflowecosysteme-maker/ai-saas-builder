@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Force dynamic rendering for API routes
 export const dynamic = 'force-dynamic'
@@ -54,13 +55,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get user profile to determine role
+    const admin = createAdminClient() as any
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', data.user.id)
+      .single()
+
+    const role = profile?.role || 'affiliate'
+
+    // Determine redirect URL based on role
+    let redirectUrl = '/dashboard'
+    if (role === 'super_admin') {
+      redirectUrl = '/super-admin'
+    } else if (role === 'admin') {
+      redirectUrl = '/admin'
+    }
+
     // Return success with user data and set cookies
     const successResponse = NextResponse.json({
       success: true,
       user: {
         id: data.user.id,
         email: data.user.email,
+        role,
+        full_name: profile?.full_name,
       },
+      redirectUrl,
     })
 
     // Copy cookies from response to successResponse

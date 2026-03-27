@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Sparkles, Loader2, LogIn, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
 
 function LoginForm() {
   const router = useRouter()
@@ -24,8 +23,8 @@ function LoginForm() {
   // Check for message (e.g., after signup)
   const message = searchParams.get('message')
 
-  // Check for redirect URL
-  const redirectTo = searchParams.get('redirect') || '/dashboard'
+  // Check for redirect URL (for affiliates who tried to access protected page)
+  const redirectTo = searchParams.get('redirect')
 
   useEffect(() => {
     if (message) {
@@ -38,30 +37,28 @@ function LoginForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
       })
 
-      if (error) {
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error)
       }
 
-      if (data.user) {
-        toast.success('Connexion réussie !')
+      toast.success('Connexion réussie !')
 
-        // Check if user is admin to redirect accordingly
-        const response = await fetch('/api/dashboard')
-        const result = await response.json()
+      // Use the redirect URL from API based on role
+      // super_admin -> /super-admin
+      // admin -> /admin
+      // affiliate -> /dashboard (or the redirect param if exists)
+      const destination = redirectTo || result.redirectUrl || '/dashboard'
+      router.push(destination)
+      router.refresh()
 
-        if (result.isAdmin) {
-          router.push('/admin')
-        } else {
-          router.push(redirectTo)
-        }
-      }
     } catch (error) {
       console.error('Login error:', error)
       toast.error(error instanceof Error ? error.message : 'Erreur de connexion')

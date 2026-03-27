@@ -28,8 +28,10 @@ import {
   Settings,
   CreditCard,
   Wallet,
+  LogOut,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 import type { Profile, Affiliate, Sale } from '@/types/database'
 
 interface DashboardStats {
@@ -53,6 +55,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { logout, isLoggingOut } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -78,7 +81,13 @@ export default function DashboardPage() {
         throw new Error(result.error)
       }
 
-      // Check if admin
+      // Check if super_admin - redirect to super-admin dashboard
+      if (result.isSuperAdmin) {
+        router.push('/super-admin')
+        return
+      }
+
+      // Check if admin - redirect to admin dashboard
       if (result.isAdmin) {
         router.push('/admin')
         return
@@ -208,11 +217,15 @@ export default function DashboardPage() {
             <p className="text-sm text-white font-medium">{profile.full_name || 'Affilié'}</p>
             <p className="text-xs text-zinc-500">{profile.email}</p>
           </div>
-          <Link href="/login">
-            <Button variant="ghost" className="text-zinc-400 hover:text-white">
-              Déconnexion
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            className="text-zinc-400 hover:text-white"
+            onClick={logout}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
+            Déconnexion
+          </Button>
         </div>
       </header>
 
