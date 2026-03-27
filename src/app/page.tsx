@@ -585,6 +585,51 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Ambassadeur Section */}
+      <section className="relative z-10 px-6 py-16 md:px-12 lg:px-24">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative rounded-3xl overflow-hidden">
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-500/20 to-purple-600/20" />
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-pink-500/10" />
+            
+            {/* Glow effects */}
+            <div className="absolute top-0 left-1/4 w-32 h-32 bg-purple-500/30 rounded-full blur-[80px]" />
+            <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-pink-500/30 rounded-full blur-[80px]" />
+            
+            {/* Content */}
+            <div className="relative p-8 md:p-10 text-center">
+              <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30">
+                <span className="text-xl">💎</span>
+                <span className="text-purple-300 font-semibold">Offre Exclusive</span>
+              </div>
+              
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                  Deviens un Ambassadeur
+                </span>
+              </h2>
+              
+              <p className="text-zinc-300 text-lg mb-6 max-w-xl mx-auto">
+                Rembourse rapidement ton investissement en partageant AffiliationPro autour de toi.
+                <span className="text-purple-400 font-semibold"> Gagne des commissions sur chaque vente !</span>
+              </p>
+              
+              <a 
+                href="https://www.ambassadeur.affiliationpro.publication-web.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-semibold text-lg transition-all duration-300 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:-translate-y-0.5"
+              >
+                <span>🌟</span>
+                Devenir Ambassadeur
+                <ArrowRight className="w-5 h-5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="relative z-10 px-6 py-8 md:px-12 lg:px-24 border-t border-purple-500/10">
         <div className="max-w-6xl mx-auto text-center">
