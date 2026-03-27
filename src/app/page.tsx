@@ -411,10 +411,10 @@ export default function Home() {
       <section id="publicationcashflow" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-5xl mx-auto">
           {/* Premium Card with animated gradient background */}
-          <div className="relative rounded-3xl overflow-hidden">
+          <div className="relative rounded-3xl pt-6">
             {/* Animated gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 via-orange-500/10 to-amber-500/20 animate-pulse" />
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10" />
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 via-orange-500/10 to-amber-500/20 animate-pulse rounded-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10 rounded-3xl" />
             
             {/* Glowing orbs in background */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/20 rounded-full blur-[100px]" />
