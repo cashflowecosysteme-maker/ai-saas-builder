@@ -342,7 +342,7 @@ export default function SuperAdminPage() {
   }
 
   const formatCurrency = (amount: number) => 
-    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount)
+    new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(amount)
   
   const formatDate = (dateStr: string) => 
     new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })

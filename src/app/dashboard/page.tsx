@@ -132,9 +132,9 @@ export default function DashboardPage() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat('fr-CA', {
       style: 'currency',
-      currency: 'EUR',
+      currency: 'CAD',
     }).format(amount)
   }
 
