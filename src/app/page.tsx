@@ -144,18 +144,18 @@ export default function Home() {
           </h1>
           
           {/* MEGA ARGUMENT - Punch pour les orphelins Systeme.io */}
-          <div className="relative max-w-4xl mx-auto mb-10 mt-12">
+          <div className="relative max-w-4xl mx-auto mb-10 mt-20">
             {/* Glow background */}
             <div className="absolute inset-0 bg-gradient-to-r from-red-500/15 via-purple-500/15 to-green-500/15 blur-3xl rounded-3xl" />
             
             <div className="relative p-8 md:p-10 rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-500/10 to-blue-500/10 backdrop-blur-sm">
-              {/* Ligne 1 - Le problème */}
-              <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-5 mb-5">
-                <span className="px-5 py-2 rounded-full bg-red-500/25 border border-red-500/40 text-red-200 text-base font-semibold animate-pulse">
+              {/* Ligne 1 - Le problème - BADGE PLUS GRAND */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 mb-6">
+                <span className="px-6 py-3 rounded-full bg-red-500/30 border-2 border-red-500/50 text-red-100 text-lg md:text-xl font-bold animate-pulse shadow-lg shadow-red-500/20">
                   ⚠️ Systeme.io a fermé son affiliation
                 </span>
-                <span className="text-zinc-300 text-xl hidden md:block">→</span>
-                <span className="text-white font-bold text-xl">
+                <span className="text-zinc-300 text-2xl hidden md:block">→</span>
+                <span className="text-white font-bold text-xl md:text-2xl">
                   Tu cherches une alternative ?
                 </span>
               </div>
