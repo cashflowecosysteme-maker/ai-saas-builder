@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { StarryBackground } from "@/components/starry-background";
 import { LogoSlider } from "@/components/logo-slider";
+import { FloatingOrbs, FloatingParticles } from "@/components/premium-animations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +27,10 @@ import {
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen overflow-hidden">
       <StarryBackground />
+      <FloatingOrbs />
+      <FloatingParticles />
 
       {/* Navigation */}
       <nav className="relative z-10 flex items-center justify-between px-4 py-3 md:px-8 lg:px-12">
@@ -126,14 +129,14 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative z-10 px-6 pt-16 pb-24 md:px-12 lg:px-24">
         <div className="max-w-6xl mx-auto text-center">
-          <Badge className="mb-6 glass-button border-purple-500/30 text-purple-300">
+          <Badge className="mb-6 glass-button border-purple-500/30 text-purple-300 shimmer">
             🚀 Alternative à l'affiliation Systeme.io
           </Badge>
           
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight slide-in-up">
             <span className="text-white">Ton programme d'affiliation</span>
             <br />
-            <span className="gradient-text">prêt en 5 minutes</span>
+            <span className="gradient-text glow-pulse-intense inline-block">prêt en 5 minutes</span>
           </h1>
           
           <p className="text-lg md:text-xl text-zinc-300 mb-8 max-w-3xl mx-auto leading-relaxed">
@@ -155,11 +158,11 @@ export default function Home() {
       {/* Done For You Section */}
       <section className="relative z-10 px-6 py-12 md:px-12 lg:px-24">
         <div className="max-w-6xl mx-auto">
-          <div className="glass-card rounded-3xl p-8 md:p-12 border border-green-500/30 bg-gradient-to-br from-green-500/5 via-transparent to-emerald-500/5">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-green-500/30 bg-gradient-to-br from-green-500/5 via-transparent to-emerald-500/5 spotlight">
             <div className="flex flex-col lg:flex-row items-center gap-8">
               {/* Image */}
               <div className="w-full lg:w-1/2 flex justify-center">
-                <div className="relative w-full max-w-md aspect-[3/2] rounded-2xl overflow-hidden border-2 border-green-500/20 shadow-2xl shadow-green-500/10">
+                <div className="relative w-full max-w-md aspect-[3/2] rounded-2xl overflow-hidden border-2 border-green-500/20 shadow-2xl shadow-green-500/10 float">
                   <Image
                     src="/heureuse.png"
                     alt="Femme heureuse - Done For You"
@@ -219,7 +222,7 @@ export default function Home() {
       <section id="features" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 slide-in-up">
               ✨ Tout ce dont tu as besoin
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto">
@@ -227,7 +230,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
             {[
               {
                 icon: BarChart3,
@@ -266,7 +269,7 @@ export default function Home() {
                 color: "text-cyan-400",
               },
             ].map((feature, i) => (
-              <Card key={i} className="glass-card glass-card-hover border-0">
+              <Card key={i} className="glass-card glass-card-hover border-0 shimmer card-tilt">
                 <CardContent className="p-6">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center mb-4">
                     <feature.icon className={`w-6 h-6 ${feature.color}`} />
@@ -330,12 +333,12 @@ export default function Home() {
         <div className="max-w-lg mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              <span className="gradient-text">39 $</span> par mois
+              <span className="gradient-text neon-text">39 $</span> par mois
             </h2>
             <p className="text-zinc-400">Pour les entreprises en croissance</p>
           </div>
 
-          <Card className="glass-card rounded-3xl p-8 glow-purple">
+          <Card className="glass-card rounded-3xl p-8 glow-pulse-intense shimmer">
             <CardContent className="p-0">
               <ul className="space-y-4 mb-8">
                 {[
@@ -368,7 +371,7 @@ export default function Home() {
       {/* PublicationCashflow - Flagship Product */}
       <section id="publicationcashflow" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-3xl p-8 md:p-12 border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-transparent to-purple-500/5">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-transparent to-purple-500/5 gradient-border-animated shimmer">
             <Badge className="mb-4 bg-amber-500/20 text-amber-300 border-amber-500/30">
               👑 Notre Solution Premium
             </Badge>
@@ -428,7 +431,7 @@ export default function Home() {
       {/* Coming Soon - Création Sites IA */}
       <section id="sitesia" className="relative z-10 px-6 py-24 md:px-12 lg:px-24 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent">
         <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-3xl p-8 md:p-12 border border-purple-500/30">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-purple-500/30 shimmer spotlight">
             <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
               🚀 Bientôt disponible
             </Badge>
@@ -484,7 +487,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="glass-card rounded-3xl p-12">
+          <div className="glass-card rounded-3xl p-12 glow-pulse-intense shimmer">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               💜 Prêt(e) à lancer ton <span className="gradient-text">programme d'affiliation</span> ?
             </h2>
