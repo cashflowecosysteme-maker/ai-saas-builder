@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Sparkles, Loader2, CheckCircle, UserPlus, Gift } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 function SignupForm() {
   const router = useRouter()
@@ -37,60 +38,60 @@ function SignupForm() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const supabase = createClient()
+
+      // Sign up with Supabase directly
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            referral_code: formData.referralCode || null,
+          },
         },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: formData.fullName,
-          referralCode: formData.referralCode || undefined,
-        }),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'inscription')
+      if (error) {
+        throw error
       }
 
-      setIsSuccess(true)
-      toast.success('Compte créé avec succès !')
-
-      // Auto-login after signup
-      try {
-        const loginResponse = await fetch('/api/auth/login', {
+      if (data.user) {
+        // Create profile via API
+        await fetch('/api/auth/signup', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: formData.email,
             password: formData.password,
+            fullName: formData.fullName,
+            referralCode: formData.referralCode || undefined,
+            userId: data.user.id,
           }),
         })
 
-        if (loginResponse.ok) {
-          // Redirect to dashboard after successful login
-          setTimeout(() => {
+        setIsSuccess(true)
+        toast.success('Compte créé avec succès !')
+
+        // Auto-login and redirect
+        setTimeout(async () => {
+          // The session should already be established by signUp
+          // Check user role and redirect
+          const profileRes = await fetch('/api/dashboard')
+          const profileData = await profileRes.json()
+
+          if (profileData.isSuperAdmin) {
+            router.push('/super-admin')
+          } else if (profileData.isAdmin) {
+            router.push('/admin')
+          } else {
             router.push('/dashboard')
-          }, 1500)
-        } else {
-          // If auto-login fails, redirect to login page
-          setTimeout(() => {
-            router.push('/login?message=Compte créé! Veuillez vous connecter.')
-          }, 1500)
-        }
-      } catch {
-        // If auto-login fails, redirect to login page
-        setTimeout(() => {
-          router.push('/login?message=Compte créé! Veuillez vous connecter.')
+          }
         }, 1500)
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'inscription')
+    } catch (error: any) {
+      console.error('Signup error:', error)
+      toast.error(error.message || 'Erreur lors de l\'inscription')
     } finally {
       setIsLoading(false)
     }
@@ -105,10 +106,10 @@ function SignupForm() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Bienvenue !</h2>
           <p className="text-zinc-400 mb-4">
-            Votre compte a été créé avec succès.
+            Ton compte a été créé avec succès.
           </p>
           <p className="text-sm text-zinc-500">
-            Redirection vers votre dashboard...
+            Redirection vers ton dashboard...
           </p>
         </CardContent>
       </Card>
@@ -126,7 +127,7 @@ function SignupForm() {
         </div>
         <CardTitle className="text-2xl text-white">Créer un compte</CardTitle>
         <CardDescription className="text-zinc-400">
-          Rejoignez le programme d&apos;affiliation 3 niveaux
+          Rejoins le programme d&apos;affiliation 3 niveaux
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -136,7 +137,7 @@ function SignupForm() {
             <Input
               id="fullName"
               type="text"
-              placeholder="Jean Dupont"
+              placeholder="Diane Boyer"
               value={formData.fullName}
               onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
               required
@@ -145,11 +146,11 @@ function SignupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-zinc-300">Email</Label>
+            <Label htmlFor="email" className="text-zinc-300">Courriel</Label>
             <Input
               id="email"
               type="email"
-              placeholder="vous@email.com"
+              placeholder="toi@email.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
@@ -187,7 +188,7 @@ function SignupForm() {
             {formData.referralCode && (
               <div className="flex items-center gap-2 text-green-400 text-sm">
                 <Gift className="w-4 h-4" />
-                <span>Vous serez parrainé ! Bonus de bienvenue potentiel.</span>
+                <span>Tu seras parrainé !</span>
               </div>
             )}
           </div>
@@ -220,7 +221,7 @@ function SignupForm() {
 
         {/* Benefits */}
         <div className="mt-6 pt-6 border-t border-purple-500/10">
-          <p className="text-xs text-zinc-500 text-center mb-3">En créant un compte, vous obtenez :</p>
+          <p className="text-xs text-zinc-500 text-center mb-3">En créant un compte, tu obtiens :</p>
           <div className="flex flex-wrap justify-center gap-2">
             <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/20">
               3 niveaux de commissions

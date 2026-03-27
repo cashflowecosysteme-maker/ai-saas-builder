@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Sparkles, Loader2, LogIn, CheckCircle } from 'lucide-react'
+import { Sparkles, Loader2, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 function LoginForm() {
   const router = useRouter()
@@ -20,10 +21,7 @@ function LoginForm() {
     password: '',
   })
 
-  // Check for message (e.g., after signup)
   const message = searchParams.get('message')
-
-  // Check for redirect URL (for affiliates who tried to access protected page)
   const redirectTo = searchParams.get('redirect')
 
   useEffect(() => {
@@ -37,31 +35,37 @@ function LoginForm() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const supabase = createClient()
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error)
+      if (error) {
+        throw error
       }
 
-      toast.success('Connexion réussie !')
+      if (data.user) {
+        toast.success('Connexion réussie !')
 
-      // Use the redirect URL from API based on role
-      // super_admin -> /super-admin
-      // admin -> /admin
-      // affiliate -> /dashboard (or the redirect param if exists)
-      const destination = redirectTo || result.redirectUrl || '/dashboard'
-      router.push(destination)
-      router.refresh()
+        // Check user role and redirect
+        const profileRes = await fetch('/api/dashboard')
+        const profileData = await profileRes.json()
 
-    } catch (error) {
+        if (profileData.isSuperAdmin) {
+          router.push('/super-admin')
+        } else if (profileData.isAdmin) {
+          router.push('/admin')
+        } else if (redirectTo) {
+          router.push(redirectTo)
+        } else {
+          router.push('/dashboard')
+        }
+      }
+    } catch (error: any) {
       console.error('Login error:', error)
-      toast.error(error instanceof Error ? error.message : 'Erreur de connexion')
+      toast.error(error.message || 'Erreur de connexion')
     } finally {
       setIsLoading(false)
     }
@@ -78,17 +82,17 @@ function LoginForm() {
         </div>
         <CardTitle className="text-2xl text-white">Connexion</CardTitle>
         <CardDescription className="text-zinc-400">
-          Connectez-vous à votre compte
+          Connecte-toi à ton compte
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-zinc-300">Email</Label>
+            <Label htmlFor="email" className="text-zinc-300">Courriel</Label>
             <Input
               id="email"
               type="email"
-              placeholder="vous@email.com"
+              placeholder="toi@email.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required

@@ -19,41 +19,40 @@ function generateAffiliateCode(): string {
 
 /**
  * POST /api/auth/signup
- * Creates a new user account with affiliate profile
+ * Creates profile and affiliate record for a new user
  */
 export async function POST(request: Request) {
   try {
-    const { email, password, fullName, referralCode } = await request.json()
+    const { email, password, fullName, referralCode, userId } = await request.json()
 
     // Validate input
-    if (!email || !password || !fullName) {
+    if (!email || !fullName) {
       return NextResponse.json(
-        { error: 'Email, mot de passe et nom complet sont requis' },
-        { status: 400 }
-      )
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Le mot de passe doit contenir au moins 6 caractères' },
+        { error: 'Email et nom complet sont requis' },
         { status: 400 }
       )
     }
 
     const admin = createAdminClient() as any
+    const targetUserId = userId
 
-    // Check if user already exists
-    const { data: existingUser } = await admin
+    // Check if profile already exists
+    const { data: existingProfile } = await admin
       .from('profiles')
-      .select('id')
-      .eq('email', email)
+      .select('id, affiliate_code')
+      .eq('id', targetUserId)
       .single()
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Un compte avec cet email existe déjà' },
-        { status: 400 }
-      )
+    if (existingProfile) {
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: targetUserId,
+          email,
+          full_name: fullName,
+          affiliate_code: existingProfile.affiliate_code,
+        },
+      })
     }
 
     // Find parent by referral code if provided
@@ -85,26 +84,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-      },
-    })
-
-    if (authError || !authData.user) {
-      console.error('Auth error:', authError)
-      return NextResponse.json(
-        { error: authError?.message || 'Erreur lors de la création du compte' },
-        { status: 400 }
-      )
-    }
-
-    const userId = authData.user.id
-
     // Generate unique affiliate code
     let affiliateCode = generateAffiliateCode()
     let codeExists = true
@@ -132,22 +111,20 @@ export async function POST(request: Request) {
       .eq('is_active', true)
       .single()
 
-    // Create or update profile (upsert in case trigger already created it)
+    // Create profile
     const { error: profileError } = await admin
       .from('profiles')
-      .upsert({
-        id: userId,
+      .insert({
+        id: targetUserId,
         email,
         full_name: fullName,
         role: 'affiliate',
         affiliate_code: affiliateCode,
         parent_id: parentId,
-      }, { onConflict: 'id' })
+      })
 
     if (profileError) {
       console.error('Profile error:', profileError)
-      // Try to clean up auth user
-      await admin.auth.admin.deleteUser(userId)
       return NextResponse.json(
         { error: 'Erreur lors de la création du profil: ' + profileError.message },
         { status: 500 }
@@ -156,27 +133,22 @@ export async function POST(request: Request) {
 
     // Create affiliate record if program exists
     if (program) {
-      const { error: affiliateError } = await admin
+      await admin
         .from('affiliates')
         .insert({
           program_id: program.id,
-          user_id: userId,
+          user_id: targetUserId,
           affiliate_link: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/r/${affiliateCode}`,
           parent_affiliate_id: parentAffiliateId,
           grandparent_affiliate_id: grandparentAffiliateId,
           status: 'active',
         })
-
-      if (affiliateError) {
-        console.error('Affiliate error:', affiliateError)
-        // Non-critical error, continue
-      }
     }
 
     return NextResponse.json({
       success: true,
       user: {
-        id: userId,
+        id: targetUserId,
         email,
         full_name: fullName,
         affiliate_code: affiliateCode,
