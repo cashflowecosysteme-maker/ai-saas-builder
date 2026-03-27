@@ -136,7 +136,11 @@ export default function Home() {
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight slide-in-up">
             <span className="text-white">Ton programme d'affiliation</span>
             <br />
-            <span className="gradient-text glow-pulse-intense inline-block">prêt en 5 minutes</span>
+            <span className="relative inline-block">
+              {/* Glow effect behind text */}
+              <span className="absolute inset-0 blur-2xl opacity-60 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 animate-pulse" style={{ transform: 'scale(1.5)' }} />
+              <span className="relative gradient-text">prêt en 5 minutes</span>
+            </span>
           </h1>
           
           <p className="text-lg md:text-xl text-zinc-300 mb-8 max-w-3xl mx-auto leading-relaxed">
@@ -370,59 +374,100 @@ export default function Home() {
 
       {/* PublicationCashflow - Flagship Product */}
       <section id="publicationcashflow" className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
-        <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-3xl p-8 md:p-12 border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-transparent to-purple-500/5 gradient-border-animated shimmer">
-            <Badge className="mb-4 bg-amber-500/20 text-amber-300 border-amber-500/30">
-              👑 Notre Solution Premium
-            </Badge>
+        <div className="max-w-5xl mx-auto">
+          {/* Premium Card with animated gradient background */}
+          <div className="relative rounded-3xl overflow-hidden">
+            {/* Animated gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 via-orange-500/10 to-amber-500/20 animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-purple-500/10" />
             
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              <span className="text-amber-400">PublicationCashflow</span>
-            </h2>
+            {/* Glowing orbs in background */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/20 rounded-full blur-[100px]" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/15 rounded-full blur-[80px]" />
+            <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-purple-500/10 rounded-full blur-[60px] transform -translate-x-1/2 -translate-y-1/2" />
             
-            <p className="text-xl text-zinc-200 mb-4 font-medium">
-              L'IA crée ton site d'affiliation en <span className="text-amber-400">60 secondes</span>.
-            </p>
-            
-            <p className="text-zinc-400 mb-6 text-lg">
-              Puis elle publie <span className="text-white font-semibold">automatiquement du contenu 24h/24 et 7j/7</span>...
-            </p>
-            
-            {/* Done For You Banner */}
-            <div className="mb-8 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 text-center">
-              <p className="text-green-400 font-semibold text-lg mb-1">
-                ✨ 100% Done For You — Zéro Technique, Zéro Stress
-              </p>
-              <p className="text-zinc-400 text-sm">
-                Tu paies. Tu cliques. L'IA fait tout le reste pendant que tu profites de ta vie.
-              </p>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {[
-                { icon: "⚡", text: "Génération en 60 sec" },
-                { icon: "🤖", text: "Contenu automatisé 24/7" },
-                { icon: "📘", text: "Intégration Facebook..." },
-                { icon: "📅", text: "Et bien plus encore..." },
-              ].map((item, i) => (
-                <div key={i} className="text-center p-4 rounded-xl bg-white/5 border border-white/10">
-                  <div className="text-2xl mb-2">{item.icon}</div>
-                  <p className="text-zinc-300 text-sm">{item.text}</p>
+            {/* Content */}
+            <div className="relative glass-card rounded-3xl p-8 md:p-12 border border-amber-500/40">
+              {/* Floating crown icon */}
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-amber-400/50 blur-xl rounded-full" />
+                  <div className="relative bg-gradient-to-br from-amber-400 to-orange-500 px-6 py-2 rounded-full text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-amber-500/30">
+                    <span className="text-lg">👑</span>
+                    Notre Solution Premium
+                  </div>
                 </div>
-              ))}
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
-              <div>
-                <p className="text-zinc-300 text-lg font-medium">Découvre ce que l'IA peut faire pour toi...</p>
-                <p className="text-amber-400 text-sm">👉 Ton employé numérique qui travaille pendant que tu dors...</p>
               </div>
-              <a href="https://www.publicationcashflow.com/" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 group">
-                  Voir la démo
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </a>
+              
+              <div className="mt-6 text-center md:text-left">
+                <h2 className="text-3xl md:text-5xl font-bold mb-4">
+                  <span className="relative inline-block">
+                    <span className="absolute inset-0 blur-2xl opacity-50 bg-amber-400" style={{ transform: 'scale(2)' }} />
+                    <span className="relative bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400 bg-clip-text text-transparent">
+                      PublicationCashflow
+                    </span>
+                  </span>
+                </h2>
+                
+                <p className="text-xl md:text-2xl text-zinc-100 mb-4 font-medium">
+                  L'IA crée ton site d'affiliation en <span className="text-amber-400 font-bold">60 secondes</span>.
+                </p>
+                
+                <p className="text-zinc-300 mb-8 text-lg">
+                  Puis elle publie <span className="text-white font-semibold">automatiquement du contenu 24h/24 et 7j/7</span>...
+                </p>
+                
+                {/* Done For You Banner - Premium Style */}
+                <div className="relative mb-8 p-5 rounded-2xl overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-green-500/10" />
+                  <div className="absolute inset-0 border border-green-500/30 rounded-2xl" />
+                  <div className="relative text-center">
+                    <p className="text-green-400 font-bold text-lg mb-1 flex items-center justify-center gap-2">
+                      <span className="text-2xl">✨</span>
+                      100% Done For You
+                      <span className="text-sm text-zinc-400 font-normal">— Zéro Technique, Zéro Stress</span>
+                    </p>
+                    <p className="text-zinc-400 text-sm">
+                      Tu paies. Tu cliques. L'IA fait tout le reste pendant que tu profites de ta vie.
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Feature Grid - Premium Cards */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  {[
+                    { icon: "⚡", text: "Génération en 60 sec", color: "from-yellow-500/20 to-amber-500/20" },
+                    { icon: "🤖", text: "Contenu automatisé 24/7", color: "from-purple-500/20 to-blue-500/20" },
+                    { icon: "📘", text: "Intégration Facebook...", color: "from-blue-500/20 to-cyan-500/20" },
+                    { icon: "📅", text: "Et bien plus encore...", color: "from-green-500/20 to-emerald-500/20" },
+                  ].map((item, i) => (
+                    <div key={i} className="relative group">
+                      <div className="absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl blur-sm" style={{ background: item.color.split(' ')[0] }} />
+                      <div className="relative text-center p-4 rounded-xl bg-white/5 border border-white/10 group-hover:border-amber-500/30 transition-all duration-300 group-hover:-translate-y-1">
+                        <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">{item.icon}</div>
+                        <p className="text-zinc-200 text-sm font-medium">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* CTA Section */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 border border-amber-500/30">
+                  <div>
+                    <p className="text-zinc-200 text-lg font-medium">Découvre ce que l'IA peut faire pour toi...</p>
+                    <p className="text-amber-400 text-sm flex items-center gap-2">
+                      <span>👉</span>
+                      <span>Ton employé numérique qui travaille pendant que tu dors...</span>
+                    </p>
+                  </div>
+                  <a href="https://www.publicationcashflow.com/" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                    <Button size="lg" className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white border-0 group shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300">
+                      Voir la démo
+                      <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
