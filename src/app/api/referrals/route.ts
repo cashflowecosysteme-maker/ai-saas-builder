@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 
 // Force dynamic rendering for API routes
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 /**
  * GET /api/referrals

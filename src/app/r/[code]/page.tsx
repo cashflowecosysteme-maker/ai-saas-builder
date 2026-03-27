@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { StarryBackground } from '@/components/starry-background'
 import { Sparkles } from 'lucide-react'
 
+export const runtime = 'edge'
+
 export default function ReferralRedirectPage() {
   const params = useParams()
   const router = useRouter()

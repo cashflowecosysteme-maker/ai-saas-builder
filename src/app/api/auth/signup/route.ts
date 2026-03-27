@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 // Force dynamic rendering for API routes
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 /**
  * Generate a unique affiliate code
@@ -131,24 +132,24 @@ export async function POST(request: Request) {
       .eq('is_active', true)
       .single()
 
-    // Create profile
+    // Create or update profile (upsert in case trigger already created it)
     const { error: profileError } = await admin
       .from('profiles')
-      .insert({
+      .upsert({
         id: userId,
         email,
         full_name: fullName,
         role: 'affiliate',
         affiliate_code: affiliateCode,
         parent_id: parentId,
-      })
+      }, { onConflict: 'id' })
 
     if (profileError) {
       console.error('Profile error:', profileError)
       // Try to clean up auth user
       await admin.auth.admin.deleteUser(userId)
       return NextResponse.json(
-        { error: 'Erreur lors de la création du profil' },
+        { error: 'Erreur lors de la création du profil: ' + profileError.message },
         { status: 500 }
       )
     }

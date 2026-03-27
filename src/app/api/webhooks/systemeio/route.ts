@@ -3,6 +3,7 @@ import { createAdminClient, getUserByAffiliateCode } from '@/lib/supabase/admin'
 
 // Force dynamic rendering for API routes
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 /**
  * Systeme.io Webhook Handler
