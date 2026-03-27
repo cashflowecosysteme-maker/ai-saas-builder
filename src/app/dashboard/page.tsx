@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { StarryBackground } from '@/components/starry-background'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import {
   Users,
   DollarSign,
@@ -24,6 +25,9 @@ import {
   Loader2,
   Crown,
   Calendar,
+  Settings,
+  CreditCard,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile, Affiliate, Sale } from '@/types/database'
@@ -40,7 +44,7 @@ interface DashboardStats {
 }
 
 interface DashboardData {
-  profile: Profile
+  profile: Profile & { paypal_email?: string | null }
   affiliate: (Affiliate & { program: { name: string; commission_l1: number; commission_l2: number; commission_l3: number } | null }) | null
   stats: DashboardStats
   parentInfo: { full_name: string | null; email: string } | null
@@ -52,6 +56,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [paypalEmail, setPaypalEmail] = useState('')
+  const [isSavingPaypal, setIsSavingPaypal] = useState(false)
 
   useEffect(() => {
     fetchDashboard()
@@ -78,6 +85,7 @@ export default function DashboardPage() {
       }
 
       setData(result)
+      setPaypalEmail(result.profile?.paypal_email || '')
     } catch (error) {
       console.error('Error fetching dashboard:', error)
       toast.error('Erreur lors du chargement des données')
@@ -92,6 +100,26 @@ export default function DashboardPage() {
     setCopied(true)
     toast.success('Lien copié !')
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSavePaypal = async () => {
+    setIsSavingPaypal(true)
+    try {
+      const response = await fetch('/api/affiliate/paypal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paypalEmail }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+
+      toast.success('PayPal enregistré ! Vous pourrez recevoir vos paiements.')
+      fetchDashboard()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    } finally {
+      setIsSavingPaypal(false)
+    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -167,6 +195,15 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`text-zinc-400 hover:text-white ${showSettings ? 'text-white bg-white/10' : ''}`}
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Paramètres
+          </Button>
           <div className="hidden md:block text-right">
             <p className="text-sm text-white font-medium">{profile.full_name || 'Affilié'}</p>
             <p className="text-xs text-zinc-500">{profile.email}</p>
@@ -178,6 +215,45 @@ export default function DashboardPage() {
           </Link>
         </div>
       </header>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="relative z-10 px-6 pt-4 md:px-12 lg:px-24 border-b border-purple-500/10 pb-6">
+          <div className="max-w-6xl mx-auto">
+            <Card className="glass-card border-0 max-w-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white flex items-center gap-2 text-lg">
+                  <CreditCard className="w-5 h-5 text-purple-400" />
+                  Configuration PayPal
+                </CardTitle>
+                <CardDescription className="text-zinc-400">
+                  Indiquez votre email PayPal pour recevoir vos paiements
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={paypalEmail}
+                    onChange={(e) => setPaypalEmail(e.target.value)}
+                    className="bg-white/5 border-purple-500/20 text-white"
+                  />
+                  <Button onClick={handleSavePaypal} disabled={isSavingPaypal} className="glass-button">
+                    {isSavingPaypal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  </Button>
+                </div>
+                {data?.profile?.paypal_email && (
+                  <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    PayPal configuré: {data.profile.paypal_email}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="relative z-10 px-6 py-8 md:px-12 lg:px-24">

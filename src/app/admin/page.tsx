@@ -5,167 +5,171 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { StarryBackground } from '@/components/starry-background'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Users,
   DollarSign,
-  Download,
   Sparkles,
-  Search,
   ShoppingCart,
   Clock,
   Shield,
   Loader2,
   UserCheck,
-  UserX,
   Calendar,
-  Crown,
+  Building,
   BarChart3,
   RefreshCw,
+  Settings,
+  CreditCard,
+  Wallet,
+  Copy,
+  Check,
+  Send,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface AdminStats {
-  totalAffiliates: number
-  newAffiliatesThisMonth: number
-  monthlySales: number
-  pendingCommissions: number
-  totalSalesCount: number
-  totalRevenue: number
-  totalPrograms: number
-}
+type TabType = 'dashboard' | 'affiliates' | 'payouts' | 'settings'
 
-interface AffiliateItem {
+interface Affiliate {
   id: string
-  email: string
-  full_name: string | null
-  affiliate_code: string
-  created_at: string
-  affiliates: Array<{
+  user_id: string
+  profile: {
     id: string
-    total_earnings: number
-    total_referrals: number
-    status: string
-  }>
+    email: string
+    full_name: string | null
+    paypal_email: string | null
+    affiliate_code: string
+    created_at: string
+  }
+  total_earnings: number
+  total_referrals: number
+  status: string
 }
 
-interface RecentSale {
+interface Sale {
   id: string
   amount: number
   status: string
   created_at: string
   commission_l1: number
   customer_email: string | null
-  affiliates: {
-    id: string
-    user_id: string
-    profile: {
-      full_name: string | null
-      email: string
-    } | null
-  } | null
 }
 
 interface AdminData {
-  stats: AdminStats
-  affiliates: AffiliateItem[]
-  recentSales: RecentSale[]
+  profile: {
+    id: string
+    email: string
+    full_name: string | null
+    paypal_email: string | null
+    affiliate_code: string
+    subdomain: string | null
+  }
+  stats: {
+    totalAffiliates: number
+    totalSales: number
+    totalRevenue: number
+    pendingPayouts: number
+    paidPayouts: number
+  }
+  affiliates: Affiliate[]
+  recentSales: Sale[]
+  pendingCommissions: { affiliate_id: string; amount: number; profile: { full_name: string | null; email: string; paypal_email: string | null } }[]
 }
 
 export default function AdminDashboardPage() {
   const router = useRouter()
   const [data, setData] = useState<AdminData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isExporting, setIsExporting] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const [paypalEmail, setPaypalEmail] = useState('')
+  const [isSavingPaypal, setIsSavingPaypal] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [processingPayout, setProcessingPayout] = useState<string | null>(null)
 
-  const fetchAdminData = useCallback(async (search?: string) => {
+  const fetchData = useCallback(async () => {
     try {
-      const url = search ? `/api/admin?search=${encodeURIComponent(search)}` : '/api/admin'
-      const response = await fetch(url)
+      const response = await fetch('/api/admin')
       const result = await response.json()
 
       if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/login')
-          return
-        }
-        if (response.status === 403) {
-          router.push('/dashboard')
-          return
-        }
-        throw new Error(result.error)
+        if (response.status === 401) router.push('/login')
+        else if (response.status === 403) router.push('/dashboard')
+        else throw new Error(result.error)
+        return
       }
 
       setData(result)
+      setPaypalEmail(result.profile?.paypal_email || '')
     } catch (error) {
-      console.error('Error fetching admin data:', error)
-      toast.error('Erreur lors du chargement des données')
+      console.error('Error:', error)
+      toast.error('Erreur lors du chargement')
     } finally {
       setIsLoading(false)
     }
   }, [router])
 
   useEffect(() => {
-    fetchAdminData()
-  }, [fetchAdminData])
+    fetchData()
+  }, [fetchData])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    fetchAdminData(searchQuery)
-  }
-
-  const handleExport = async (type: 'affiliates' | 'sales') => {
-    setIsExporting(true)
+  const handleSavePaypal = async () => {
+    setIsSavingPaypal(true)
     try {
-      const response = await fetch('/api/admin', {
+      const response = await fetch('/api/admin/paypal', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ type }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paypalEmail }),
       })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de l&apos;export')
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${type}.csv`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      a.remove()
-
-      toast.success('Export téléchargé avec succès')
+      toast.success('PayPal enregistré')
+      fetchData()
     } catch (error) {
-      console.error('Export error:', error)
-      toast.error('Erreur lors de l&apos;export')
+      toast.error(error instanceof Error ? error.message : 'Erreur')
     } finally {
-      setIsExporting(false)
+      setIsSavingPaypal(false)
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount)
+  const handlePayout = async (affiliateId: string, amount: number) => {
+    setProcessingPayout(affiliateId)
+    try {
+      const response = await fetch('/api/admin/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ affiliateId, amount }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+
+      toast.success('Paiement effectué')
+      fetchData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    } finally {
+      setProcessingPayout(null)
+    }
   }
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
+  const copyLink = () => {
+    const link = data?.profile?.subdomain
+      ? `https://${data.profile.subdomain}.affiliationpro.publication-web.com/r/${data.profile.affiliate_code}`
+      : `${window.location.origin}/r/${data?.profile?.affiliate_code}`
+    navigator.clipboard.writeText(link)
+    setCopied(true)
+    toast.success('Lien copié !')
+    setTimeout(() => setCopied(false), 2000)
   }
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount)
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
   if (isLoading) {
     return (
@@ -173,7 +177,7 @@ export default function AdminDashboardPage() {
         <StarryBackground />
         <div className="relative z-10 text-center">
           <Loader2 className="w-10 h-10 text-purple-500 animate-spin mx-auto mb-4" />
-          <p className="text-zinc-400">Chargement du dashboard admin...</p>
+          <p className="text-zinc-400">Chargement...</p>
         </div>
       </div>
     )
@@ -185,17 +189,17 @@ export default function AdminDashboardPage() {
         <StarryBackground />
         <Card className="glass-card max-w-md relative z-10">
           <CardContent className="p-8 text-center">
-            <p className="text-zinc-400 mb-4">Impossible de charger les données</p>
-            <Button onClick={() => fetchAdminData()} className="glass-button">
-              Réessayer
-            </Button>
+            <p className="text-zinc-400 mb-4">Accès non autorisé</p>
+            <Button onClick={() => router.push('/login')} className="glass-button">Connexion</Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  const { stats, affiliates, recentSales } = data
+  const referralLink = data.profile?.subdomain
+    ? `https://${data.profile.subdomain}.affiliationpro.publication-web.com/r/${data.profile.affiliate_code}`
+    : `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${data.profile.affiliate_code}`
 
   return (
     <div className="relative min-h-screen">
@@ -210,320 +214,319 @@ export default function AdminDashboardPage() {
             </div>
             <span className="font-bold gradient-text">AffiliationPro</span>
           </Link>
-          <Badge className="ml-2 bg-amber-500/10 text-amber-400 border-amber-500/30">
-            <Shield className="w-3 h-3 mr-1" />
-            Admin
+          <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+            <Building className="w-3 h-3 mr-1" />Admin
           </Badge>
         </div>
 
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-zinc-400 hover:text-white"
-            onClick={() => { setIsLoading(true); fetchAdminData(); }}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Actualiser
+          <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-white" onClick={() => { setIsLoading(true); fetchData(); }}>
+            <RefreshCw className="w-4 h-4 mr-2" />Actualiser
           </Button>
           <Link href="/login">
-            <Button variant="ghost" className="text-zinc-400 hover:text-white">
-              Déconnexion
-            </Button>
+            <Button variant="ghost" className="text-zinc-400 hover:text-white">Déconnexion</Button>
           </Link>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="relative z-10 px-6 py-8 md:px-12 lg:px-24">
+      {/* Tab Navigation */}
+      <div className="relative z-10 px-6 pt-6 md:px-12 lg:px-24">
         <div className="max-w-7xl mx-auto">
-          {/* Title */}
-          <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                <Crown className="w-8 h-8 text-amber-400" />
-                Dashboard Admin
-              </h1>
-              <p className="text-zinc-400">
-                Vue d&apos;ensemble de votre programme d&apos;affiliation
-              </p>
-            </div>
-
-            <div className="flex gap-2">
+          <div className="flex gap-2 border-b border-purple-500/10 pb-4 overflow-x-auto">
+            {[
+              { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3 },
+              { id: 'affiliates' as TabType, label: 'Mon équipe', icon: Users },
+              { id: 'payouts' as TabType, label: 'Paiements', icon: Wallet },
+              { id: 'settings' as TabType, label: 'Paramètres', icon: Settings },
+            ].map((tab) => (
               <Button
-                variant="outline"
-                className="border-purple-500/20 text-zinc-300 hover:text-white hover:bg-purple-500/10"
-                onClick={() => handleExport('affiliates')}
-                disabled={isExporting}
+                key={tab.id}
+                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                className={`flex items-center gap-2 ${activeTab === tab.id ? 'glass-button text-white' : 'text-zinc-400 hover:text-white'}`}
+                onClick={() => setActiveTab(tab.id)}
               >
-                <Download className="w-4 h-4 mr-2" />
-                Exporter affiliés
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
               </Button>
-              <Button
-                variant="outline"
-                className="border-purple-500/20 text-zinc-300 hover:text-white hover:bg-purple-500/10"
-                onClick={() => handleExport('sales')}
-                disabled={isExporting}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exporter ventes
-              </Button>
-            </div>
+            ))}
           </div>
+        </div>
+      </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="glass-card glass-card-hover border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Users className="w-8 h-8 text-purple-500" />
-                  <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">
-                    +{stats.newAffiliatesThisMonth} ce mois
-                  </Badge>
-                </div>
-                <p className="text-zinc-400 text-sm mb-1">Total affiliés</p>
-                <p className="text-2xl font-bold text-white">{stats.totalAffiliates}</p>
-              </CardContent>
-            </Card>
+      {/* Main Content */}
+      <main className="relative z-10 px-6 py-6 md:px-12 lg:px-24">
+        <div className="max-w-7xl mx-auto">
 
-            <Card className="glass-card glass-card-hover border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <BarChart3 className="w-8 h-8 text-blue-500" />
-                </div>
-                <p className="text-zinc-400 text-sm mb-1">Ventes du mois</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(stats.monthlySales)}</p>
-              </CardContent>
-            </Card>
+          {/* DASHBOARD TAB */}
+          {activeTab === 'dashboard' && (
+            <>
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-white mb-1">
+                  Bienvenue, {data.profile?.full_name?.split(' ')[0] || 'Admin'} 👋
+                </h1>
+                <p className="text-zinc-400 text-sm">Gérez votre programme d'affiliation</p>
+              </div>
 
-            <Card className="glass-card glass-card-hover border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <Clock className="w-8 h-8 text-amber-500" />
-                </div>
-                <p className="text-zinc-400 text-sm mb-1">Commissions dues</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(stats.pendingCommissions)}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card glass-card-hover border-0">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <DollarSign className="w-8 h-8 text-green-500" />
-                </div>
-                <p className="text-zinc-400 text-sm mb-1">Revenus totaux</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(stats.totalRevenue)}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Secondary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="glass-card rounded-xl p-4 border border-purple-500/10">
-              <p className="text-zinc-500 text-xs mb-1">Total ventes</p>
-              <p className="text-xl font-bold text-white">{stats.totalSalesCount}</p>
-            </div>
-            <div className="glass-card rounded-xl p-4 border border-purple-500/10">
-              <p className="text-zinc-500 text-xs mb-1">Programmes actifs</p>
-              <p className="text-xl font-bold text-white">{stats.totalPrograms}</p>
-            </div>
-            <div className="glass-card rounded-xl p-4 border border-purple-500/10">
-              <p className="text-zinc-500 text-xs mb-1">Nouveaux ce mois</p>
-              <p className="text-xl font-bold text-white">{stats.newAffiliatesThisMonth}</p>
-            </div>
-            <div className="glass-card rounded-xl p-4 border border-purple-500/10">
-              <p className="text-zinc-500 text-xs mb-1">Panier moyen</p>
-              <p className="text-xl font-bold text-white">
-                {stats.totalSalesCount > 0
-                  ? formatCurrency(stats.totalRevenue / stats.totalSalesCount)
-                  : formatCurrency(0)}
-              </p>
-            </div>
-          </div>
-
-          {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Affiliates List */}
-            <Card className="glass-card border-0">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Users className="w-5 h-5 text-purple-400" />
-                    Liste des affiliés
-                  </CardTitle>
-                  <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/20">
-                    {affiliates.length} résultats
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Search */}
-                <form onSubmit={handleSearch} className="mb-4">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <Input
-                        type="text"
-                        placeholder="Rechercher par nom, email ou code..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 bg-white/5 border-purple-500/20 text-white placeholder:text-zinc-500 focus:border-purple-500"
-                      />
+              {/* Referral Link */}
+              <Card className="glass-card border-0 border-green-500/30 mb-6">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                      <p className="text-zinc-400 text-sm mb-1">Votre lien de recrutement</p>
+                      <p className="font-mono text-white text-sm break-all">{referralLink}</p>
                     </div>
-                    <Button type="submit" className="glass-button">
-                      Rechercher
+                    <Button onClick={copyLink} className="glass-button shrink-0">
+                      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>
-                </form>
+                </CardContent>
+              </Card>
 
-                {/* Affiliates Table */}
-                <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                  {affiliates.length === 0 ? (
-                    <div className="text-center py-8 text-zinc-500">
-                      <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p>Aucun affilié trouvé</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {affiliates.map((affiliate) => (
-                        <div
-                          key={affiliate.id}
-                          className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-purple-500/10"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                                {affiliate.full_name?.[0]?.toUpperCase() || affiliate.email[0].toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-white font-medium">
-                                  {affiliate.full_name || 'Sans nom'}
-                                </p>
-                                <p className="text-zinc-500 text-xs">{affiliate.email}</p>
-                              </div>
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <Card className="glass-card border-0">
+                  <CardContent className="p-4 text-center">
+                    <Users className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{data.stats.totalAffiliates}</p>
+                    <p className="text-zinc-500 text-xs">Affiliés</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card border-0">
+                  <CardContent className="p-4 text-center">
+                    <ShoppingCart className="w-6 h-6 text-cyan-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{data.stats.totalSales}</p>
+                    <p className="text-zinc-500 text-xs">Ventes</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card border-0">
+                  <CardContent className="p-4 text-center">
+                    <DollarSign className="w-6 h-6 text-green-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{formatCurrency(data.stats.totalRevenue)}</p>
+                    <p className="text-zinc-500 text-xs">Revenus</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card border-0">
+                  <CardContent className="p-4 text-center">
+                    <Clock className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{formatCurrency(data.stats.pendingPayouts)}</p>
+                    <p className="text-zinc-500 text-xs">À payer</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card border-0">
+                  <CardContent className="p-4 text-center">
+                    <Wallet className="w-6 h-6 text-pink-400 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-white">{formatCurrency(data.stats.paidPayouts)}</p>
+                    <p className="text-zinc-500 text-xs">Payés</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Recent Sales */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <ShoppingCart className="w-5 h-5 text-purple-400" />
+                    Dernières ventes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                    {data.recentSales.length === 0 ? (
+                      <div className="text-center py-8 text-zinc-500">
+                        <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p>Aucune vente</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {data.recentSales.map((sale) => (
+                          <div key={sale.id} className="p-3 rounded-lg bg-white/5 border border-purple-500/10 flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium">{formatCurrency(sale.amount)}</p>
+                              <p className="text-zinc-500 text-xs">{sale.customer_email || 'Client anonyme'}</p>
                             </div>
                             <div className="text-right">
-                              <Badge
-                                className={
-                                  affiliate.affiliates?.[0]?.status === 'active'
-                                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                    : affiliate.affiliates?.[0]?.status === 'paused'
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                    : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                                }
-                              >
-                                {affiliate.affiliates?.[0]?.status === 'active' ? (
-                                  <UserCheck className="w-3 h-3 mr-1" />
-                                ) : (
-                                  <UserX className="w-3 h-3 mr-1" />
-                                )}
-                                {affiliate.affiliates?.[0]?.status || 'actif'}
+                              <Badge className={sale.status === 'paid' ? 'bg-green-500/10 text-green-400' : 'bg-amber-500/10 text-amber-400'}>
+                                {sale.status === 'paid' ? 'Payé' : 'En attente'}
                               </Badge>
-                              <p className="text-xs text-zinc-500 mt-1">
-                                Code: {affiliate.affiliate_code}
-                              </p>
+                              <p className="text-xs text-zinc-500 mt-1">{formatDate(sale.created_at)}</p>
                             </div>
                           </div>
-                          <div className="flex gap-4 mt-2 pt-2 border-t border-purple-500/10 text-xs text-zinc-400">
-                            <span>Gains: <span className="text-green-400 font-medium">{formatCurrency(affiliate.affiliates?.[0]?.total_earnings || 0)}</span></span>
-                            <span>Referrals: <span className="text-white font-medium">{affiliate.affiliates?.[0]?.total_referrals || 0}</span></span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(affiliate.created_at)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
 
-            {/* Recent Sales */}
+          {/* AFFILIATES TAB */}
+          {activeTab === 'affiliates' && (
             <Card className="glass-card border-0">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5 text-purple-400" />
-                  Dernières ventes
+                <CardTitle className="text-white flex items-center gap-2 text-lg">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  Mon équipe d'affiliés ({data.affiliates.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="max-h-96 overflow-y-auto custom-scrollbar">
-                  {recentSales.length === 0 ? (
+                <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
+                  {data.affiliates.length === 0 ? (
                     <div className="text-center py-8 text-zinc-500">
-                      <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p>Aucune vente récente</p>
+                      <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p>Aucun affilié pour le moment</p>
+                      <p className="text-sm mt-1">Partagez votre lien pour recruter</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {recentSales.map((sale) => (
-                        <div
-                          key={sale.id}
-                          className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-purple-500/10"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-white font-medium">
-                                {formatCurrency(sale.amount)}
-                              </p>
-                              <p className="text-zinc-500 text-xs">
-                                par {sale.affiliates?.profile?.full_name || sale.affiliates?.profile?.email || 'Affilié'}
-                              </p>
+                    data.affiliates.map((affiliate) => (
+                      <div key={affiliate.id} className="p-4 rounded-lg bg-white/5 border border-purple-500/10">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                              {affiliate.profile.full_name?.[0]?.toUpperCase() || affiliate.profile.email[0].toUpperCase()}
                             </div>
-                            <div className="text-right">
-                              <Badge
-                                className={
-                                  sale.status === 'paid'
-                                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                    : sale.status === 'pending'
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                    : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                                }
-                              >
-                                {sale.status === 'paid' ? 'Payé' : sale.status === 'pending' ? 'En attente' : sale.status}
-                              </Badge>
-                              <p className="text-xs text-zinc-500 mt-1">
-                                Commission: <span className="text-green-400">{formatCurrency(sale.commission_l1)}</span>
-                              </p>
+                            <div>
+                              <p className="text-white font-medium">{affiliate.profile.full_name || 'Sans nom'}</p>
+                              <p className="text-zinc-400 text-sm">{affiliate.profile.email}</p>
                             </div>
                           </div>
-                          <div className="flex justify-between items-center mt-2 pt-2 border-t border-purple-500/10 text-xs text-zinc-400">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(sale.created_at)}
-                            </span>
-                            {sale.customer_email && (
-                              <span>Client: {sale.customer_email.split('@')[0]}***</span>
-                            )}
+                          <div className="text-right">
+                            <Badge className={affiliate.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-zinc-500/10 text-zinc-400'}>
+                              <UserCheck className="w-3 h-3 mr-1" />
+                              {affiliate.status === 'active' ? 'Actif' : affiliate.status}
+                            </Badge>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex gap-4 mt-3 pt-3 border-t border-purple-500/10 text-sm text-zinc-400">
+                          <span>Gains: <span className="text-green-400 font-medium">{formatCurrency(affiliate.total_earnings || 0)}</span></span>
+                          <span>Filleuls: <span className="text-white font-medium">{affiliate.total_referrals || 0}</span></span>
+                          <span>PayPal: <span className={affiliate.profile.paypal_email ? 'text-green-400' : 'text-amber-400'}>{affiliate.profile.paypal_email || 'Non configuré'}</span></span>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {/* PAYOUTS TAB */}
+          {activeTab === 'payouts' && (
+            <Card className="glass-card border-0">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white flex items-center gap-2 text-lg">
+                  <Wallet className="w-5 h-5 text-purple-400" />
+                  Paiements à effectuer
+                </CardTitle>
+                <CardDescription className="text-zinc-400">
+                  Payez vos affiliés pour leurs commissions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
+                  {(!data.pendingCommissions || data.pendingCommissions.length === 0) ? (
+                    <div className="text-center py-8 text-zinc-500">
+                      <Wallet className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p>Aucun paiement en attente</p>
+                    </div>
+                  ) : (
+                    data.pendingCommissions.map((commission) => (
+                      <div key={commission.affiliate_id} className="p-4 rounded-lg bg-white/5 border border-amber-500/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-white font-medium">{commission.profile?.full_name || commission.profile?.email}</p>
+                            <p className="text-zinc-400 text-sm">
+                              PayPal: <span className={commission.profile?.paypal_email ? 'text-green-400' : 'text-red-400'}>
+                                {commission.profile?.paypal_email || 'Non configuré'}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-amber-400">{formatCurrency(commission.amount)}</p>
+                            <Button
+                              size="sm"
+                              className="glass-button mt-2"
+                              disabled={!commission.profile?.paypal_email || processingPayout === commission.affiliate_id}
+                              onClick={() => handlePayout(commission.affiliate_id, commission.amount)}
+                            >
+                              {processingPayout === commission.affiliate_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <Send className="w-4 h-4 mr-1" />
+                                  Payer
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* SETTINGS TAB */}
+          {activeTab === 'settings' && (
+            <div className="max-w-xl space-y-6">
+              {/* PayPal */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <CreditCard className="w-5 h-5 text-purple-400" />
+                    Configuration PayPal
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Votre email PayPal pour recevoir les paiements
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="votre@email.com"
+                      value={paypalEmail}
+                      onChange={(e) => setPaypalEmail(e.target.value)}
+                      className="bg-white/5 border-purple-500/20 text-white"
+                    />
+                    <Button onClick={handleSavePaypal} disabled={isSavingPaypal} className="glass-button">
+                      {isSavingPaypal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Subdomain */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <Shield className="w-5 h-5 text-purple-400" />
+                    Sous-domaine
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Contactez le support pour configurer votre sous-domaine personnalisé
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-white font-mono">
+                    {data.profile?.subdomain 
+                      ? `${data.profile.subdomain}.affiliationpro.publication-web.com`
+                      : 'Non configuré'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
         </div>
       </main>
 
-      {/* Custom Scrollbar Styles */}
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(168, 85, 247, 0.05);
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(168, 85, 247, 0.3);
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(168, 85, 247, 0.5);
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(168, 85, 247, 0.05); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.3); border-radius: 3px; }
       `}</style>
     </div>
   )
