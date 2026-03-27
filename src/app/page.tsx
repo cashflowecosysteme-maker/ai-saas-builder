@@ -508,62 +508,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Coming Soon - Création Sites IA */}
-      <section id="sitesia" className="relative z-10 px-6 py-24 md:px-12 lg:px-24 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent">
-        <div className="max-w-4xl mx-auto">
-          <div className="glass-card rounded-3xl p-8 md:p-12 border border-purple-500/30 shimmer spotlight">
-            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
-              🚀 Bientôt disponible
-            </Badge>
-            
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Création de <span className="gradient-text">Sites IA Premium</span>
-            </h2>
-            
-            <p className="text-zinc-300 mb-6 text-lg">
-              Tu connais notre <span className="text-purple-400 font-semibold">Générateur d'affiliation</span> ?
-              On pousse le concept encore plus loin !
-            </p>
-            
-            <p className="text-zinc-400 mb-8">
-              <span className="text-white font-medium">Mini-sites premium</span> pour coachs, thérapeutes, freelancers, ambassadeurs, 
-              numérologues, astrologues, et tous les entrepreneurs du bien-être...
-            </p>
-            
-            <div className="grid sm:grid-cols-2 gap-4 mb-8">
-              {[
-                "🎨 10+ templates professionnels",
-                "🤖 Génération IA illimitée",
-                "🔗 Sous-domaine inclus",
-                "📱 Carte numérique d'affaire",
-                "💼 Portfolio & services",
-                "📅 Prise de rendez-vous",
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-2 text-zinc-300">
-                  <Check className="w-4 h-4 text-green-400 shrink-0" />
-                  <span>{item.substring(2)}</span>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
-              <div>
-                <p className="text-zinc-400 text-sm">Prix de lancement</p>
-                <p className="text-4xl font-bold gradient-text">69 <span className="text-xl">$</span></p>
-                <p className="text-zinc-500 text-sm">par mois</p>
-              </div>
-              <div className="flex flex-col gap-3 w-full sm:w-auto">
-                <Button size="lg" className="glass-button text-white border-0 group">
-                  🔔 Rejoindre la liste d'attente
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-                <p className="text-xs text-zinc-500 text-center">Sois informé(e) en premier !</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="relative z-10 px-6 py-24 md:px-12 lg:px-24">
         <div className="max-w-4xl mx-auto text-center">
@@ -625,6 +569,62 @@ export default function Home() {
                 Devenir Ambassadeur
                 <ArrowRight className="w-5 h-5" />
               </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Coming Soon - Création Sites IA */}
+      <section id="sitesia" className="relative z-10 px-6 py-24 md:px-12 lg:px-24 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-card rounded-3xl p-8 md:p-12 border border-purple-500/30 shimmer spotlight">
+            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+              🚀 Bientôt disponible
+            </Badge>
+            
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Création de <span className="gradient-text">Sites IA Premium</span>
+            </h2>
+            
+            <p className="text-zinc-300 mb-6 text-lg">
+              Tu connais notre <span className="text-purple-400 font-semibold">Générateur d'affiliation</span> ?
+              On pousse le concept encore plus loin !
+            </p>
+            
+            <p className="text-zinc-400 mb-8">
+              <span className="text-white font-medium">Mini-sites premium</span> pour coachs, thérapeutes, freelancers, ambassadeurs, 
+              numérologues, astrologues, et tous les entrepreneurs du bien-être...
+            </p>
+            
+            <div className="grid sm:grid-cols-2 gap-4 mb-8">
+              {[
+                "🎨 10+ templates professionnels",
+                "🤖 Génération IA illimitée",
+                "🔗 Sous-domaine inclus",
+                "📱 Carte numérique d'affaire",
+                "💼 Portfolio & services",
+                "📅 Prise de rendez-vous",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-zinc-300">
+                  <Check className="w-4 h-4 text-green-400 shrink-0" />
+                  <span>{item.substring(2)}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+              <div>
+                <p className="text-zinc-400 text-sm">Prix de lancement</p>
+                <p className="text-4xl font-bold gradient-text">69 <span className="text-xl">$</span></p>
+                <p className="text-zinc-500 text-sm">par mois</p>
+              </div>
+              <div className="flex flex-col gap-3 w-full sm:w-auto">
+                <Button size="lg" className="glass-button text-white border-0 group">
+                  🔔 Rejoindre la liste d'attente
+                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <p className="text-xs text-zinc-500 text-center">Sois informé(e) en premier !</p>
+              </div>
             </div>
           </div>
         </div>
