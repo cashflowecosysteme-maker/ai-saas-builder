@@ -39,9 +39,8 @@ export async function createToken(payload: SessionPayload): Promise<string> {
     iat: now,
     exp: now + 7 * 24 * 60 * 60,
   })))
-  const signature = base64url(
-    new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`${header}.${body}`)))
-  )
+  const sigBuf = await crypto.subtle.sign('HMAC', key, encoder.encode(`${header}.${body}`))
+  const signature = base64url(new Uint8Array(sigBuf))
 
   return `${header}.${body}.${signature}`
 }
