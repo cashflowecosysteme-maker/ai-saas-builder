@@ -59,10 +59,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ isAdmin: true, profile })
     }
 
-    // Get affiliate record
+    // Get affiliate record with program info (commissions rates)
     const { data: affiliate, error: affiliateError } = await admin
       .from('affiliates')
-      .select('*')
+      .select(`
+        *,
+        programs (
+          name,
+          commission_l1,
+          commission_l2,
+          commission_l3
+        )
+      `)
       .eq('user_id', user.id)
       .single()
 
@@ -71,6 +79,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         profile,
         affiliate: null,
+        team: [],
+        messages: [],
         stats: {
           totalEarnings: 0,
           pendingCommissions: 0,
@@ -84,6 +94,82 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // --- 1. FETCH TEAM MEMBERS (L1, L2, L3) ---
+    const team: any[] = []
+
+    // Fetch Level 1 (Direct referrals)
+    const { data: l1Data } = await admin
+      .from('affiliates')
+      .select('id, created_at, profiles(full_name, email)')
+      .eq('parent_affiliate_id', affiliate.id)
+
+    const l1Ids: string[] = []
+    
+    if (l1Data) {
+      l1Data.forEach((m: any) => {
+        l1Ids.push(m.id)
+        team.push({
+          id: m.id,
+          full_name: m.profiles?.full_name || 'Nouveau',
+          email: m.profiles?.email || 'Non renseigné',
+          level: 1,
+          created_at: m.created_at
+        })
+      })
+    }
+
+    // Fetch Level 2
+    const { data: l2Data } = await admin
+      .from('affiliates')
+      .select('id, created_at, profiles(full_name, email)')
+      .eq('grandparent_affiliate_id', affiliate.id)
+
+    const l2Ids: string[] = []
+
+    if (l2Data) {
+      l2Data.forEach((m: any) => {
+        l2Ids.push(m.id)
+        team.push({
+          id: m.id,
+          full_name: m.profiles?.full_name || 'Nouveau',
+          email: m.profiles?.email || 'Non renseigné',
+          level: 2,
+          created_at: m.created_at
+        })
+      })
+    }
+
+    // Fetch Level 3 (Children of L2)
+    if (l2Ids.length > 0) {
+      const { data: l3Data } = await admin
+        .from('affiliates')
+        .select('id, created_at, profiles(full_name, email)')
+        .in('parent_affiliate_id', l2Ids)
+
+      if (l3Data) {
+        l3Data.forEach((m: any) => {
+          team.push({
+            id: m.id,
+            full_name: m.profiles?.full_name || 'Nouveau',
+            email: m.profiles?.email || 'Non renseigné',
+            level: 3,
+            created_at: m.created_at
+          })
+        })
+      }
+    }
+
+    // --- 2. FETCH MESSAGES FROM SUPER ADMIN ---
+    // On cherche les messages adressés à tout le monde (broadcast) ou à cet utilisateur spécifiquement
+    const { data: messages } = await admin
+      .from('messages')
+      .select('id, subject, content, created_at, read')
+      .or(`user_id.eq.${user.id},is_broadcast.eq.true`)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    // --- 3. CALCULATE STATS ---
+    
     // Get total earnings (paid commissions)
     const { data: paidCommissions } = await admin
       .from('commissions')
@@ -108,32 +194,17 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .eq('affiliate_id', affiliate.id)
 
-    // Get Level 1 referrals (direct)
-    const { count: l1Referrals } = await admin
-      .from('affiliates')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_affiliate_id', affiliate.id)
-
-    // Get Level 2 referrals
-    const { count: l2Referrals } = await admin
-      .from('affiliates')
-      .select('*', { count: 'exact', head: true })
-      .eq('grandparent_affiliate_id', affiliate.id)
-
-    // Get Level 3 referrals
-    const { data: l2Affiliates } = await admin
-      .from('affiliates')
-      .select('id')
-      .eq('grandparent_affiliate_id', affiliate.id)
-
-    let l3Referrals = 0
-    if (l2Affiliates && l2Affiliates.length > 0) {
-      const l2Ids = l2Affiliates.map((a: any) => a.id)
-      const { count } = await admin
-        .from('affiliates')
-        .select('*', { count: 'exact', head: true })
-        .in('parent_affiliate_id', l2Ids)
-      l3Referrals = count || 0
+    // Get counts for referrals
+    const l1Count = l1Data?.length || 0
+    const l2Count = l2Data?.length || 0
+    
+    let l3Count = 0
+    if (l2Ids.length > 0) {
+        const { count } = await admin
+          .from('affiliates')
+          .select('*', { count: 'exact', head: true })
+          .in('parent_affiliate_id', l2Ids)
+        l3Count = count || 0
     }
 
     // Get recent sales (last 10)
@@ -184,14 +255,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       profile,
-      affiliate,
+      affiliate: {
+        ...affiliate,
+        // On aide le frontend en aplatissant les données du programme
+        program: affiliate.programs || affiliate.program 
+      },
+      team, // Nouvelle donnée
+      messages: messages || [], // Nouvelle donnée
       stats: {
         totalEarnings,
         pendingCommissions: pendingCommissionsTotal,
         totalClicks: totalClicks || 0,
-        l1Referrals: l1Referrals || 0,
-        l2Referrals: l2Referrals || 0,
-        l3Referrals,
+        l1Referrals: l1Count,
+        l2Referrals: l2Count,
+        l3Referrals: l3Count,
         recentSales: recentSales || [],
         weeklySales,
       },
