@@ -38,45 +38,45 @@ function SignupForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
-
-      // Sign up with Supabase directly
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            referral_code: formData.referralCode || null,
-          },
-        },
+      // Step 1: Create auth user + profile via API (handles everything server-side)
+      const apiRes = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
+          referralCode: formData.referralCode || undefined,
+        }),
       })
 
-      if (error) {
-        throw error
+      const apiData = await apiRes.json()
+
+      if (!apiRes.ok) {
+        throw new Error(apiData.error || 'Erreur lors de la création du compte')
       }
 
-      if (data.user) {
-        // Create profile via API
-        await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            fullName: formData.fullName,
-            referralCode: formData.referralCode || undefined,
-            userId: data.user.id,
-          }),
-        })
+      // Step 2: Auto-login with the credentials
+      const supabase = createClient()
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
 
+      if (loginError) {
+        // Account created but auto-login failed (e.g. email confirmation needed)
         setIsSuccess(true)
-        toast.success('Compte créé avec succès !')
+        toast.success('Compte créé ! Connecte-toi avec tes identifiants.')
+        setTimeout(() => router.push('/login'), 2000)
+        return
+      }
 
-        // Auto-login and redirect
-        setTimeout(async () => {
-          // The session should already be established by signUp
-          // Check user role and redirect
+      // Step 3: Success - redirect to appropriate dashboard
+      setIsSuccess(true)
+      toast.success('Compte créé avec succès !')
+
+      setTimeout(async () => {
+        try {
           const profileRes = await fetch('/api/dashboard')
           const profileData = await profileRes.json()
 
@@ -87,8 +87,10 @@ function SignupForm() {
           } else {
             router.push('/dashboard')
           }
-        }, 1500)
-      }
+        } catch {
+          router.push('/login')
+        }
+      }, 1500)
     } catch (error: any) {
       console.error('Signup error:', error)
       toast.error(error.message || 'Erreur lors de l\'inscription')
