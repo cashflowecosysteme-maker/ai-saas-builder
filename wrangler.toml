@@ -10,7 +10,7 @@ directory = ".open-next/assets"
 [[d1_databases]]
 binding = "DB"
 database_name = "affiliation-pro-db"
-database_id = "PLACEHOLDER_D1_ID"
+database_id = "0b22a4ba-4d5f-404d-b2e0-4838de6b1822"
 
 # Environment variables
 [vars]
