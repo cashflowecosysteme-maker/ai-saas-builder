@@ -38,46 +38,69 @@ function SignupForm() {
     setIsLoading(true)
 
     try {
-      // Step 1: Create auth user + profile via API (handles everything server-side)
-      const apiRes = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: formData.fullName,
-          referralCode: formData.referralCode || undefined,
-        }),
-      })
-
-      const apiData = await apiRes.json()
-
-      if (!apiRes.ok) {
-        throw new Error(apiData.error || 'Erreur lors de la création du compte')
-      }
-
-      // Step 2: Auto-login with the credentials
       const supabase = createClient()
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+
+      // Step 1: Create auth user via Supabase client (works in browser)
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            referral_code: formData.referralCode || null,
+          },
+        },
       })
 
-      if (loginError) {
-        // Account created but auto-login failed (e.g. email confirmation needed)
-        setIsSuccess(true)
-        toast.success('Compte créé ! Connecte-toi avec tes identifiants.')
-        setTimeout(() => router.push('/login'), 2000)
-        return
+      if (error) {
+        throw error
       }
 
-      // Step 3: Success - redirect to appropriate dashboard
+      if (!data.user) {
+        throw new Error('Erreur lors de la création du compte. Réessaie.')
+      }
+
+      // Step 2: Create/update profile via API (uses service role key)
+      try {
+        const apiRes = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            fullName: formData.fullName,
+            referralCode: formData.referralCode || undefined,
+            userId: data.user.id,
+          }),
+        })
+
+        if (apiRes.ok) {
+          const apiData = await apiRes.json()
+          console.log('Profile created/updated:', apiData.success)
+        } else {
+          // API returned an error - try to parse as JSON
+          let errorMsg = 'Problème avec le profil (non critique)'
+          try {
+            const apiData = await apiRes.json()
+            errorMsg = apiData.error || errorMsg
+          } catch {
+            errorMsg = 'Erreur serveur (problème de profil, non critique)'
+          }
+          console.warn('Profile API warning:', errorMsg)
+        }
+      } catch (apiErr) {
+        // API call failed (network error, not JSON, etc.) - not critical
+        console.warn('Profile API call failed (non-critical):', apiErr)
+      }
+
+      // Step 3: Success
       setIsSuccess(true)
       toast.success('Compte créé avec succès !')
 
+      // Step 4: Redirect to appropriate dashboard after short delay
       setTimeout(async () => {
         try {
           const profileRes = await fetch('/api/dashboard')
+          if (!profileRes.ok) throw new Error('dashboard fetch failed')
           const profileData = await profileRes.json()
 
           if (profileData.isSuperAdmin) {
