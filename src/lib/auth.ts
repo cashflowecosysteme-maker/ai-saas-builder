@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
 
-const COOKIE_NAME = 'affiliation-pro-session'
+export const COOKIE_NAME = 'affiliation-pro-session'
 
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET || 'affiliation-pro-secret-change-in-production'
