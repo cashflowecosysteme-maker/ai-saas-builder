@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
   try {
     const admin = createAdminClient() as any
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search')
+    const rawSearch = searchParams.get('search') || ''
+    // Sanitize search input to prevent SQL injection
+    const search = rawSearch.replace(/[%'\\]/g, '')
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,37 +57,47 @@ export async function GET(request: NextRequest) {
     const totalPayouts = paidData?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0
 
     // Get all admins
-    const { data: admins } = await admin
+    const adminsQuery = admin
       .from('profiles')
-      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at')
+      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, webhook_secret, created_at')
       .eq('role', 'admin')
-      .order('created_at', { ascending: false })
+    if (search) {
+      adminsQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+    }
+    const { data: admins } = await adminsQuery.order('created_at', { ascending: false })
 
     // Build teams structure: Admin -> Level 2 (their affiliates) -> Level 3
     const teams = []
     
     for (const adminUser of (admins || [])) {
       // Get level 2 affiliates (parent_id = admin.id)
-      const { data: level2 } = await admin
+      const level2Query = admin
         .from('profiles')
         .select('id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at')
         .eq('parent_id', adminUser.id)
+      if (search) {
+        level2Query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+      }
+      const { data: level2 } = await level2Query
 
-      // Count level 3 (affiliates of level 2)
-      let level3Count = 0
-      if (level2 && level2.length > 0) {
-        const level2Ids = level2.map((l2: any) => l2.id)
-        const { count } = await admin
+      // For each L2, get their L3 members
+      const level2WithL3 = []
+      for (const l2 of (level2 || [])) {
+        const { data: level3 } = await admin
           .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .in('parent_id', level2Ids)
-        level3Count = count || 0
+          .select('id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at')
+          .eq('parent_id', l2.id)
+
+        level2WithL3.push({
+          ...l2,
+          level3: level3 || [],
+        })
       }
 
       teams.push({
         admin: adminUser,
-        level2: level2 || [],
-        level3Count,
+        level2: level2WithL3,
+        level3Count: level2WithL3.reduce((sum: number, l2: any) => sum + (l2.level3?.length || 0), 0),
       })
     }
 
@@ -97,11 +109,13 @@ export async function GET(request: NextRequest) {
       .limit(20)
 
     // Get messages
-    const { data: messages } = await admin
+    const messagesQuery = admin
       .from('messages')
       .select('id, subject, content, sender_id, recipient_id, is_broadcast, created_at, read_at, sender:profiles!messages_sender_id_fkey(full_name, email), recipient:profiles!messages_recipient_id_fkey(full_name, email)')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    if (search) {
+      messagesQuery.or(`subject.ilike.%${search}%,content.ilike.%${search}%`)
+    }
+    const { data: messages } = await messagesQuery.order('created_at', { ascending: false }).limit(50)
 
     return NextResponse.json({
       stats: {

@@ -46,22 +46,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ redirect: '/super-admin' })
     }
 
-    // Get affiliates for this admin (admin_id = current user)
-    let affiliatesQuery = admin
-      .from('affiliates')
-      .select(`
-        id,
-        user_id,
-        status,
-        total_earnings,
-        total_referrals,
-        profile:profiles!affiliates_user_id_fkey(id, email, full_name, paypal_email, affiliate_code, created_at)
-      `)
-      .eq('user_id', user.id)
+    // Get Level 2 affiliates: profiles where admin_id = current user
+    const { data: teamMembers } = await admin
+      .from('profiles')
+      .select('id, email, full_name, paypal_email, affiliate_code, role, created_at, admin_id')
+      .eq('admin_id', user.id)
+      .eq('role', 'affiliate')
+      .order('created_at', { ascending: false })
 
-    const { data: affiliateRecords } = await affiliatesQuery
+    // Get affiliate record IDs and stats for these team members
+    const memberIds = teamMembers?.map((m: any) => m.id) || []
+    const { data: affiliateRecords } = memberIds.length > 0
+      ? await admin.from('affiliates').select('id, user_id, status, total_earnings, total_referrals').in('user_id', memberIds)
+      : { data: [] }
 
-    // Get affiliate IDs
+    // Build a map of user_id -> affiliate record for quick lookup
+    const affiliateByUserId = new Map<string, any>()
+    affiliateRecords?.forEach((a: any) => affiliateByUserId.set(a.user_id, a))
+
+    // Merge profile data with affiliate stats
+    const affiliates = (teamMembers || []).map((m: any) => {
+      const aff = affiliateByUserId.get(m.id)
+      return {
+        id: m.id,
+        email: m.email,
+        full_name: m.full_name,
+        paypal_email: m.paypal_email,
+        affiliate_code: m.affiliate_code,
+        role: m.role,
+        created_at: m.created_at,
+        admin_id: m.admin_id,
+        status: aff?.status || 'active',
+        total_earnings: aff?.total_earnings || 0,
+        total_referrals: aff?.total_referrals || 0,
+        affiliate_record_id: aff?.id || null,
+      }
+    })
+
+    // Get Level 3 affiliates: children of Level 2 members
+    const { data: level3Members } = memberIds.length > 0
+      ? await admin.from('profiles').select('id, email, full_name, affiliate_code, role, created_at, parent_id, admin_id').in('parent_id', memberIds)
+      : { data: [] }
+
+    // Get affiliate IDs from affiliate records (for sales/commissions queries)
     const affiliateIds = affiliateRecords?.map((a: any) => a.id) || []
 
     // Get total sales for this admin's affiliates
@@ -144,13 +171,15 @@ export async function GET(request: NextRequest) {
         subdomain: profile.subdomain,
       },
       stats: {
-        totalAffiliates: affiliateRecords?.length || 0,
+        totalAffiliates: affiliates.length,
+        totalLevel3: level3Members?.length || 0,
         totalSales,
         totalRevenue,
         pendingPayouts,
         paidPayouts: paidPayoutsTotal,
       },
-      affiliates: affiliateRecords || [],
+      affiliates,
+      level3: level3Members || [],
       recentSales: recentSales || [],
       pendingCommissions: Object.values(aggregatedPayouts),
     })

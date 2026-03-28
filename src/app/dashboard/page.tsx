@@ -29,6 +29,8 @@ import {
   CreditCard,
   LogOut,
   MessageSquare,
+  TrendingUp,
+  MessageCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
@@ -186,6 +188,22 @@ export default function DashboardPage() {
   }
 
   const maxWeeklyTotal = Math.max(...(data?.stats.weeklySales.map(s => s.total) || [1]), 1)
+
+  const maskEmail = (email: string) => {
+    const [user, domain] = email.split('@')
+    if (!domain) return email
+    return `${user.slice(0, 2)}***@${domain}`
+  }
+
+  const formatDateFull = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }
+
+  const shareText = 'Rejoignez mon équipe avec AffiliationPro !'
 
   if (isLoading) {
     return (
@@ -370,11 +388,11 @@ export default function DashboardPage() {
                   </div>
                   
                   {/* BOUTONS DE PARTAGE CORRIGÉS */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                      className="flex-1 min-w-[120px] border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
                       onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       <Share2 className="w-4 h-4 mr-1" />
@@ -383,7 +401,25 @@ export default function DashboardPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 border-pink-500/30 text-pink-400 hover:bg-pink-500/10"
+                      className="flex-1 min-w-[120px] border-black/30 text-zinc-200 hover:bg-black/10 hover:text-white"
+                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(referralLink)}`, '_blank')}
+                    >
+                      <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                      X (Twitter)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 min-w-[120px] border-green-500/30 text-green-400 hover:bg-green-500/10"
+                      onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${referralLink}`)}`, '_blank')}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-1" />
+                      WhatsApp
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 min-w-[120px] border-pink-500/30 text-pink-400 hover:bg-pink-500/10"
                       onClick={handleNativeShare}
                     >
                       <Share2 className="w-4 h-4 mr-1" />
@@ -392,7 +428,7 @@ export default function DashboardPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 border-purple-500/20 text-zinc-300 hover:text-white hover:bg-purple-500/10"
+                      className="flex-1 min-w-[120px] border-purple-500/20 text-zinc-300 hover:text-white hover:bg-purple-500/10"
                       onClick={() => {
                         navigator.clipboard.writeText(`${profile.full_name} vous invite à rejoindre AffiliationPro! ${referralLink}`)
                         toast.success('Message copié !')
@@ -460,6 +496,124 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* 📊 Ventes de la semaine + Répartition des commissions */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <Card className="glass-card border-0 lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  Ventes de la semaine
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats.weeklySales.map((sale, index) => {
+                    const percentage = maxWeeklyTotal > 0 ? (sale.total / maxWeeklyTotal) * 100 : 0
+                    const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+                    const date = new Date(sale.date)
+                    const dayName = dayNames[date.getDay()]
+                    return (
+                      <div key={sale.date} className="flex items-center gap-3">
+                        <span className="w-10 text-xs text-zinc-500 font-medium shrink-0">{dayName}</span>
+                        <div className="flex-1 h-7 bg-white/5 rounded-full overflow-hidden">
+                          {sale.total > 0 ? (
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-1000 ease-out flex items-center justify-end pr-2"
+                              style={{ width: `${Math.max(percentage, 5)}%`, transitionDelay: `${index * 100}ms` }}
+                            >
+                              <span className="text-xs font-medium text-white drop-shadow-sm whitespace-nowrap">
+                                {formatCurrency(sale.total)}
+                                {sale.count > 1 && <span className="text-emerald-200/70 ml-1">({sale.count})</span>}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="h-full w-full bg-zinc-800/50 rounded-full" />
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card border-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-white flex items-center gap-2 text-base">
+                  <BarChart3 className="w-5 h-5 text-purple-400" />
+                  Répartition des commissions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-center p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                    <p className="text-2xl font-bold text-purple-300">{stats.l1Referrals}</p>
+                    <p className="text-xs text-zinc-400 mt-1">Filleuls directs</p>
+                    <Badge className="mt-2 bg-purple-500/20 text-purple-300 border-purple-500/30">Niveau 1</Badge>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                    <p className="text-2xl font-bold text-blue-300">{stats.l2Referrals}</p>
+                    <p className="text-xs text-zinc-400 mt-1">Filleuls N2</p>
+                    <Badge className="mt-2 bg-blue-500/20 text-blue-300 border-blue-500/30">Niveau 2</Badge>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <p className="text-2xl font-bold text-green-300">{stats.l3Referrals}</p>
+                    <p className="text-xs text-zinc-400 mt-1">Filleuls N3</p>
+                    <Badge className="mt-2 bg-green-500/20 text-green-300 border-green-500/30">Niveau 3</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 💰 Ventes récentes */}
+          <Card className="glass-card border-0 mb-8">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-green-400" />
+                Ventes récentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.recentSales.length === 0 ? (
+                <div className="text-center py-8 text-zinc-500">
+                  <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p>Aucune vente récente</p>
+                  <p className="text-sm">Partagez votre lien pour commencer à gagner !</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stats.recentSales.slice(0, 5).map((sale) => (
+                    <div key={sale.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg font-bold text-green-400">{formatCurrency(sale.amount)}</span>
+                          <Badge className={
+                            sale.status === 'paid'
+                              ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }>
+                            {sale.status === 'paid' ? 'Payé' : 'En attente'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-zinc-500">
+                          {sale.customer_email && (
+                            <span>{maskEmail(sale.customer_email)}</span>
+                          )}
+                          <span>{formatDateFull(sale.created_at)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right ml-4 shrink-0">
+                        <p className="text-xs text-zinc-500">Commission</p>
+                        <p className="text-sm font-medium text-emerald-400">{formatCurrency(sale.commission_l1)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* MON ÉQUIPE */}
           <Card className="glass-card border-0 mb-8">

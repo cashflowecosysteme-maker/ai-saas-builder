@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { StarryBackground } from '@/components/starry-background'
@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import {
   Users,
   DollarSign,
@@ -46,6 +53,12 @@ import {
   TrendingUp,
   Wallet,
   LogOut,
+  ChevronDown,
+  ChevronRight,
+  Link2,
+  ExternalLink,
+  UserPlus,
+  Webhook,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
@@ -62,8 +75,10 @@ interface Profile {
   subdomain: string | null
   parent_id: string | null
   created_at: string
+  webhook_secret?: string | null
   parent?: { full_name: string | null; email: string } | null
   children?: Profile[]
+  level3?: Profile[]
   affiliates?: Array<{
     id: string
     total_earnings: number
@@ -120,9 +135,11 @@ export default function SuperAdminPage() {
   const { logout, isLoggingOut } = useAuth()
   const [data, setData] = useState<SuperAdminData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [searchQuery, setSearchQuery] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   // New user form
   const [newUser, setNewUser] = useState({
@@ -155,6 +172,39 @@ export default function SuperAdminPage() {
   const [adminPassword, setAdminPassword] = useState({ current: '', new: '', confirm: '' })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  // Feature 1: Create Affiliate linked to Admin
+  const [affiliateDialogOpen, setAffiliateDialogOpen] = useState(false)
+  const [affiliateForAdmin, setAffiliateForAdmin] = useState<Profile | null>(null)
+  const [affiliateForm, setAffiliateForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+  })
+
+  // Feature 3: Webhook Info Dialog
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false)
+  const [webhookAdmin, setWebhookAdmin] = useState<Profile | null>(null)
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false)
+  const [isGeneratingSecret, setIsGeneratingSecret] = useState(false)
+
+  // Feature 4: User Detail Panel
+  const [userDetailOpen, setUserDetailOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null)
+  const [detailResetPassword, setDetailResetPassword] = useState(false)
+  const [detailNewPassword, setDetailNewPassword] = useState('')
+
+  // Feature 2: Collapsible L2 sections in Teams tab
+  const [expandedL2, setExpandedL2] = useState<Set<string>>(new Set())
+
+  const toggleL2 = (l2Id: string) => {
+    setExpandedL2((prev) => {
+      const next = new Set(prev)
+      if (next.has(l2Id)) next.delete(l2Id)
+      else next.add(l2Id)
+      return next
+    })
+  }
+
   const fetchData = useCallback(async (search?: string) => {
     try {
       const url = search ? `/api/super-admin?search=${encodeURIComponent(search)}` : '/api/super-admin'
@@ -174,6 +224,7 @@ export default function SuperAdminPage() {
       toast.error('Erreur lors du chargement')
     } finally {
       setIsLoading(false)
+      setIsSearching(false)
     }
   }, [router])
 
@@ -181,10 +232,140 @@ export default function SuperAdminPage() {
     fetchData()
   }, [fetchData])
 
+  // Feature 5: Debounced search
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!value.trim()) {
+      setIsSearching(true)
+      fetchData()
+      return
+    }
+    setIsSearching(true)
+    searchTimerRef.current = setTimeout(() => {
+      fetchData(value)
+    }, 300)
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    setIsSearching(true)
     fetchData(searchQuery)
+  }
+
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    setIsSearching(true)
+    fetchData()
+  }
+
+  // Feature 1: Generate random password
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#'
+    let pass = ''
+    for (let i = 0; i < 12; i++) pass += chars[Math.floor(Math.random() * chars.length)]
+    return pass
+  }
+
+  const openAffiliateDialog = (admin: Profile) => {
+    setAffiliateForAdmin(admin)
+    setAffiliateForm({ fullName: '', email: '', password: generatePassword() })
+    setAffiliateDialogOpen(true)
+  }
+
+  const handleCreateAffiliate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!affiliateForAdmin) return
+    setIsCreatingUser(true)
+    try {
+      const response = await fetch('/api/super-admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: affiliateForm.email,
+          password: affiliateForm.password,
+          fullName: affiliateForm.fullName,
+          role: 'affiliate',
+          adminId: affiliateForAdmin.id,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+      toast.success('Affilié créé avec succès')
+      setAffiliateDialogOpen(false)
+      setAffiliateForAdmin(null)
+      fetchData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    } finally {
+      setIsCreatingUser(false)
+    }
+  }
+
+  // Feature 3: Generate webhook secret
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  const openWebhookDialog = (admin: Profile) => {
+    setWebhookAdmin(admin)
+    setShowWebhookSecret(false)
+    setWebhookDialogOpen(true)
+  }
+
+  const handleGenerateSecret = async () => {
+    if (!webhookAdmin) return
+    setIsGeneratingSecret(true)
+    try {
+      const secret = generateUUID()
+      const response = await fetch('/api/super-admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: webhookAdmin.id, webhook_secret: secret }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+      toast.success('Secret webhook généré')
+      fetchData()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    } finally {
+      setIsGeneratingSecret(false)
+    }
+  }
+
+  // Feature 4: User detail
+  const openUserDetail = (user: Profile) => {
+    setSelectedUser(user)
+    setDetailResetPassword(false)
+    setDetailNewPassword('')
+    setUserDetailOpen(true)
+  }
+
+  const handleDetailResetPassword = async () => {
+    if (!selectedUser || !detailNewPassword || detailNewPassword.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères')
+      return
+    }
+    try {
+      const response = await fetch('/api/super-admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.id, newPassword: detailNewPassword }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
+      toast.success('Mot de passe réinitialisé')
+      setDetailResetPassword(false)
+      setDetailNewPassword('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur')
+    }
   }
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -352,7 +533,23 @@ export default function SuperAdminPage() {
     toast.success('Copié !')
   }
 
-  if (isLoading) {
+  // Helper: find the parent admin for an affiliate
+  const findParentAdmin = (userId: string): Profile | null => {
+    for (const team of data?.teams || []) {
+      if (team.admin.id === userId) return team.admin
+      for (const l2 of team.level2) {
+        if (l2.id === userId) return team.admin
+        if (l2.level3) {
+          for (const l3 of l2.level3) {
+            if (l3.id === userId) return team.admin
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  if (isLoading && !data) {
     return (
       <div className="relative min-h-screen flex items-center justify-center">
         <StarryBackground />
@@ -604,18 +801,38 @@ export default function SuperAdminPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {data.admins.length === 0 && (
+                    <div className="text-center py-8 text-zinc-500">
+                      <Building className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p>Aucun résultat</p>
+                    </div>
+                  )}
                   <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
                     {data.admins.map((admin) => (
                       <div key={admin.id} className="p-4 rounded-lg bg-white/5 border border-purple-500/10">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold">
+                            <div 
+                              className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => openUserDetail(admin)}
+                            >
                               {admin.full_name?.[0]?.toUpperCase() || admin.email[0].toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-white font-medium">{admin.full_name || 'Sans nom'}</p>
+                              <p 
+                                className="text-white font-medium cursor-pointer hover:text-amber-400 transition-colors"
+                                onClick={() => openUserDetail(admin)}
+                              >
+                                {admin.full_name || 'Sans nom'}
+                              </p>
                               <p className="text-zinc-400 text-sm flex items-center gap-2">
-                                <Mail className="w-3 h-3" />{admin.email}
+                                <Mail className="w-3 h-3" />
+                                <span 
+                                  className="cursor-pointer hover:text-amber-400 transition-colors"
+                                  onClick={() => openUserDetail(admin)}
+                                >
+                                  {admin.email}
+                                </span>
                                 <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => copyToClipboard(admin.email)}>
                                   <Copy className="w-3 h-3" />
                                 </Button>
@@ -623,13 +840,35 @@ export default function SuperAdminPage() {
                               <p className="text-zinc-500 text-xs">Code: {admin.affiliate_code} • {formatDate(admin.created_at)}</p>
                             </div>
                           </div>
-                          <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20">
-                            <Building className="w-3 h-3 mr-1" />Admin
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {/* Feature 3: Webhook eye icon */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-zinc-400 hover:text-cyan-400"
+                              onClick={() => openWebhookDialog(admin)}
+                              title="Voir webhook"
+                            >
+                              <Webhook className="w-4 h-4" />
+                            </Button>
+                            {/* Feature 1: Add affiliate button */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 border-green-500/30 text-green-400 hover:bg-green-500/10"
+                              onClick={() => openAffiliateDialog(admin)}
+                            >
+                              <UserPlus className="w-3 h-3 mr-1" />
+                              <span className="hidden sm:inline">+ Ajouter affilié</span>
+                            </Button>
+                            <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20">
+                              <Building className="w-3 h-3 mr-1" />Admin
+                            </Badge>
+                          </div>
                         </div>
 
                         {/* Subdomain */}
-                        <div className="mt-3 pt-3 border-t border-purple-500/10 flex items-center justify-between">
+                        <div className="mt-3 pt-3 border-t border-purple-500/10 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2 text-sm">
                             <Globe className="w-4 h-4 text-blue-400" />
                             <span className="text-zinc-400">Sous-domaine:</span>
@@ -692,19 +931,28 @@ export default function SuperAdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-[600px] overflow-y-auto custom-scrollbar space-y-4">
+                    {data.teams.length === 0 && (
+                      <div className="text-center py-8 text-zinc-500">
+                        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p>Aucune équipe trouvée</p>
+                      </div>
+                    )}
                     {data.teams.map((team) => (
-                      <div key={team.admin.id} className="rounded-xl border border-blue-500/20 overflow-hidden">
+                      <div key={team.admin.id} className="rounded-xl border border-amber-500/20 overflow-hidden">
                         {/* Admin Header */}
-                        <div className="p-4 bg-blue-500/10 flex items-center justify-between">
+                        <div 
+                          className="p-4 bg-amber-500/10 flex items-center justify-between cursor-pointer hover:bg-amber-500/15 transition-colors"
+                          onClick={() => openUserDetail(team.admin)}
+                        >
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold">
                               {team.admin.full_name?.[0]?.toUpperCase() || team.admin.email[0].toUpperCase()}
                             </div>
                             <div>
                               <p className="text-white font-semibold">{team.admin.full_name || 'Sans nom'}</p>
                               <p className="text-zinc-400 text-sm">{team.admin.email}</p>
                             </div>
-                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                            <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">
                               <Building className="w-3 h-3 mr-1" />Admin
                             </Badge>
                           </div>
@@ -717,22 +965,75 @@ export default function SuperAdminPage() {
                         {/* Level 2 Affiliates */}
                         {team.level2.length > 0 && (
                           <div className="p-4 space-y-2 bg-white/5">
-                            {team.level2.map((l2) => (
-                              <div key={l2.id} className="ml-4 p-3 rounded-lg bg-purple-500/5 border border-purple-500/10">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-sm font-bold">
-                                    {l2.full_name?.[0]?.toUpperCase() || l2.email[0].toUpperCase()}
+                            {team.level2.map((l2) => {
+                              const hasL3 = l2.level3 && l2.level3.length > 0
+                              const isExpanded = expandedL2.has(l2.id)
+                              return (
+                                <div key={l2.id} className="ml-4">
+                                  {/* L2 row */}
+                                  <div 
+                                    className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 flex items-center gap-3 cursor-pointer hover:bg-blue-500/10 transition-colors"
+                                    onClick={() => openUserDetail(l2)}
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                      {l2.full_name?.[0]?.toUpperCase() || l2.email[0].toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-white font-medium text-sm">{l2.full_name || 'Sans nom'}</p>
+                                      <p className="text-zinc-500 text-xs truncate">{l2.email}</p>
+                                    </div>
+                                    <Badge className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-xs flex-shrink-0">
+                                      Niveau 2
+                                    </Badge>
+                                    {hasL3 && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); toggleL2(l2.id) }}
+                                        className="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+                                        title={isExpanded ? 'Réduire' : 'Déplier'}
+                                      >
+                                        {isExpanded 
+                                          ? <ChevronDown className="w-4 h-4 text-zinc-400" />
+                                          : <ChevronRight className="w-4 h-4 text-zinc-400" />
+                                        }
+                                      </button>
+                                    )}
                                   </div>
-                                  <div className="flex-1">
-                                    <p className="text-white font-medium text-sm">{l2.full_name || 'Sans nom'}</p>
-                                    <p className="text-zinc-500 text-xs">{l2.email}</p>
-                                  </div>
-                                  <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/20 text-xs">
-                                    Niveau 2
-                                  </Badge>
+
+                                  {/* Feature 2: Level 3 collapsible section */}
+                                  {hasL3 && isExpanded && (
+                                    <div className="ml-6 mt-2 space-y-1.5">
+                                      <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-1 px-1">
+                                        Niveau 3 ({l2.level3!.length})
+                                      </p>
+                                      {l2.level3!.map((l3) => (
+                                        <div 
+                                          key={l3.id}
+                                          className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/10 flex items-center gap-3 cursor-pointer hover:bg-purple-500/10 transition-colors"
+                                          onClick={() => openUserDetail(l3)}
+                                        >
+                                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-fuchsia-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                            {l3.full_name?.[0]?.toUpperCase() || l3.email[0].toUpperCase()}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-white text-sm">{l3.full_name || 'Sans nom'}</p>
+                                            <p className="text-zinc-500 text-xs truncate">{l3.email}</p>
+                                          </div>
+                                          <div className="flex items-center gap-2 flex-shrink-0">
+                                            <Badge className={`text-xs ${l3.paypal_email ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'}`}>
+                                              <CreditCard className="w-2.5 h-2.5 mr-1" />
+                                              {l3.paypal_email ? 'PayPal ✓' : 'PayPal ✗'}
+                                            </Badge>
+                                            <span className="text-zinc-600 text-xs hidden sm:inline">
+                                              {formatDate(l3.created_at)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         )}
 
@@ -857,7 +1158,7 @@ export default function SuperAdminPage() {
                       <Input type="password" value={adminPassword.confirm} onChange={(e) => setAdminPassword({ ...adminPassword, confirm: e.target.value })} className="bg-white/5 border-purple-500/20 text-white" required minLength={6} />
                     </div>
                     <Button type="submit" disabled={isChangingPassword} className="w-full glass-button">
-                      {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Key className="w-4 h-4 mr-2" />}
+                      {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <><Key className="w-4 h-4 mr-2" /></>}
                       Changer le mot de passe
                     </Button>
                   </form>
@@ -868,6 +1169,343 @@ export default function SuperAdminPage() {
 
         </div>
       </main>
+
+      {/* ============================================================ */}
+      {/* Feature 1: Create Affiliate Dialog */}
+      {/* ============================================================ */}
+      <Dialog open={affiliateDialogOpen} onOpenChange={setAffiliateDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-zinc-900 border-purple-500/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <UserPlus className="w-5 h-5 text-green-400" />
+              Ajouter un affilié
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Créer un affilié lié à {affiliateForAdmin?.full_name || affiliateForAdmin?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateAffiliate} className="space-y-4">
+            <div>
+              <Label className="text-zinc-300">Code de référence</Label>
+              <Input 
+                value={affiliateForAdmin?.affiliate_code || ''} 
+                disabled 
+                className="h-10 bg-white/5 border-purple-500/20 text-zinc-400" 
+              />
+            </div>
+            <div>
+              <Label className="text-zinc-300">Nom complet</Label>
+              <Input 
+                placeholder="Nom de l'affilié" 
+                value={affiliateForm.fullName} 
+                onChange={(e) => setAffiliateForm({ ...affiliateForm, fullName: e.target.value })} 
+                required 
+                className="h-10 bg-white/5 border-purple-500/20 text-white" 
+              />
+            </div>
+            <div>
+              <Label className="text-zinc-300">Email</Label>
+              <Input 
+                type="email" 
+                placeholder="email@exemple.com" 
+                value={affiliateForm.email} 
+                onChange={(e) => setAffiliateForm({ ...affiliateForm, email: e.target.value })} 
+                required 
+                className="h-10 bg-white/5 border-purple-500/20 text-white" 
+              />
+            </div>
+            <div>
+              <Label className="text-zinc-300">Mot de passe</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input 
+                    type={showPassword['affiliate-new'] ? 'text' : 'password'} 
+                    value={affiliateForm.password} 
+                    onChange={(e) => setAffiliateForm({ ...affiliateForm, password: e.target.value })} 
+                    required 
+                    minLength={6} 
+                    className="h-10 bg-white/5 border-purple-500/20 text-white pr-10" 
+                  />
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    className="absolute right-0 top-0 h-10 w-10 p-0 text-zinc-400"
+                    onClick={() => setShowPassword({ ...showPassword, ['affiliate-new']: !showPassword['affiliate-new'] })}
+                  >
+                    {showPassword['affiliate-new'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-10 border-purple-500/20 text-zinc-300 flex-shrink-0"
+                  onClick={() => setAffiliateForm({ ...affiliateForm, password: generatePassword() })}
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />Générer
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={isCreatingUser} className="flex-1 glass-button">
+                {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserPlus className="w-4 h-4 mr-2" />Créer l'affilié</>}
+              </Button>
+              <Button type="button" variant="outline" className="border-purple-500/20 text-zinc-300" onClick={() => setAffiliateDialogOpen(false)}>
+                Annuler
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============================================================ */}
+      {/* Feature 3: Webhook Info Dialog */}
+      {/* ============================================================ */}
+      <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
+        <DialogContent className="sm:max-w-lg bg-zinc-900 border-purple-500/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Webhook className="w-5 h-5 text-cyan-400" />
+              Configuration Webhook
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Webhook Systeme.io pour {webhookAdmin?.full_name || webhookAdmin?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Webhook URL */}
+            <div>
+              <Label className="text-zinc-300 flex items-center gap-2 mb-2">
+                <Globe className="w-4 h-4 text-cyan-400" />
+                URL du Webhook
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  readOnly 
+                  value={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/api/webhooks/systemeio?admin_id=${webhookAdmin?.id || ''}`} 
+                  className="h-10 bg-white/5 border-purple-500/20 text-zinc-300 text-sm font-mono"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-10 border-purple-500/20 text-zinc-300 flex-shrink-0"
+                  onClick={() => copyToClipboard(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/api/webhooks/systemeio?admin_id=${webhookAdmin?.id || ''}`)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Webhook Secret */}
+            <div>
+              <Label className="text-zinc-300 flex items-center gap-2 mb-2">
+                <Key className="w-4 h-4 text-amber-400" />
+                Clé secrète
+              </Label>
+              {webhookAdmin?.webhook_secret ? (
+                <div className="flex items-center gap-2">
+                  <Input 
+                    readOnly 
+                    type={showWebhookSecret ? 'text' : 'password'} 
+                    value={webhookAdmin.webhook_secret} 
+                    className="h-10 bg-white/5 border-purple-500/20 text-white text-sm font-mono flex-1"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-10 w-10 p-0 text-zinc-400"
+                    onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                  >
+                    {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-10 border-purple-500/20 text-zinc-300 flex-shrink-0"
+                    onClick={() => copyToClipboard(webhookAdmin.webhook_secret!)}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <p className="text-zinc-500 text-sm">Aucune clé secrète configurée</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    onClick={handleGenerateSecret}
+                    disabled={isGeneratingSecret}
+                  >
+                    {isGeneratingSecret ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Sparkles className="w-4 h-4 mr-1" />Générer</>}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <p className="text-zinc-500 text-xs">
+              Cette clé doit être configurée dans les paramètres webhook de Systeme.io pour valider les signatures des événements.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============================================================ */}
+      {/* Feature 4: User Detail Panel Dialog */}
+      {/* ============================================================ */}
+      <Dialog open={userDetailOpen} onOpenChange={setUserDetailOpen}>
+        <DialogContent className="sm:max-w-lg bg-zinc-900 border-purple-500/20 text-white max-h-[90vh] overflow-y-auto custom-scrollbar">
+          {selectedUser && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                    selectedUser.role === 'admin' 
+                      ? 'bg-gradient-to-br from-amber-500 to-orange-600' 
+                      : 'bg-gradient-to-br from-purple-500 to-fuchsia-600'
+                  }`}>
+                    {selectedUser.full_name?.[0]?.toUpperCase() || selectedUser.email[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-white text-lg">{selectedUser.full_name || 'Sans nom'}</DialogTitle>
+                    <DialogDescription className="text-zinc-400">{selectedUser.email}</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* User Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                    <p className="text-zinc-500 text-xs mb-1">Rôle</p>
+                    <Badge className={selectedUser.role === 'admin' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-purple-500/10 text-purple-300 border-purple-500/20'}>
+                      {selectedUser.role === 'admin' ? <><Building className="w-3 h-3 mr-1" />Admin</> : <><User className="w-3 h-3 mr-1" />Affilié</>}
+                    </Badge>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                    <p className="text-zinc-500 text-xs mb-1">Inscrit le</p>
+                    <p className="text-white text-sm">{formatDate(selectedUser.created_at)}</p>
+                  </div>
+                </div>
+
+                {/* Affiliate Link & Code */}
+                <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                  <p className="text-zinc-500 text-xs mb-2 flex items-center gap-1">
+                    <Link2 className="w-3 h-3" />Code d'affiliation
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-amber-400 text-sm font-mono flex-1">{selectedUser.affiliate_code}</code>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-zinc-400" onClick={() => copyToClipboard(selectedUser.affiliate_code)}>
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <p className="text-zinc-500 text-xs mt-2 flex items-center gap-1">
+                    <Link2 className="w-3 h-3" />Lien d'affiliation
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <code className="text-cyan-400 text-xs font-mono flex-1 truncate">
+                      {process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/?ref={selectedUser.affiliate_code}
+                    </code>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-zinc-400 flex-shrink-0" onClick={() => copyToClipboard(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/?ref=${selectedUser.affiliate_code}`)}>
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* PayPal */}
+                <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                  <p className="text-zinc-500 text-xs mb-1 flex items-center gap-1">
+                    <CreditCard className="w-3 h-3" />Email PayPal
+                  </p>
+                  {selectedUser.paypal_email ? (
+                    <div className="flex items-center gap-2">
+                      <p className="text-green-400 text-sm">{selectedUser.paypal_email}</p>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-zinc-400" onClick={() => copyToClipboard(selectedUser.paypal_email!)}>
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-500 text-sm">Non configuré</p>
+                  )}
+                </div>
+
+                {/* Parent admin (for affiliates) */}
+                {selectedUser.role === 'affiliate' && selectedUser.parent_id && (
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                    <p className="text-zinc-500 text-xs mb-1 flex items-center gap-1">
+                      <Building className="w-3 h-3" />Admin lié
+                    </p>
+                    <p className="text-amber-400 text-sm">{selectedUser.parent?.full_name || selectedUser.parent?.email || findParentAdmin(selectedUser.id)?.full_name || findParentAdmin(selectedUser.id)?.email || 'Inconnu'}</p>
+                  </div>
+                )}
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10 text-center">
+                    <p className="text-zinc-500 text-xs mb-1">Ventes</p>
+                    <p className="text-white font-bold">
+                      {selectedUser.affiliates?.reduce((acc, a) => acc + a.total_referrals, 0) || 0}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10 text-center">
+                    <p className="text-zinc-500 text-xs mb-1">Commissions</p>
+                    <p className="text-emerald-400 font-bold text-sm">
+                      {formatCurrency(selectedUser.affiliates?.reduce((acc, a) => acc + a.total_earnings, 0) || 0)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10 text-center">
+                    <p className="text-zinc-500 text-xs mb-1">Équipe</p>
+                    <p className="text-white font-bold">
+                      {(selectedUser.children?.length || 0) + (selectedUser.level3?.length || 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2 pt-2 border-t border-purple-500/10">
+                  {!detailResetPassword ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-purple-500/20 text-zinc-300"
+                      onClick={() => setDetailResetPassword(true)}
+                    >
+                      <Key className="w-4 h-4 mr-2" />Réinitialiser le mot de passe
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+                      <p className="text-zinc-400 text-sm">Entrez le nouveau mot de passe :</p>
+                      <div className="flex gap-2">
+                        <Input 
+                          type="password" 
+                          placeholder="Nouveau mot de passe" 
+                          value={detailNewPassword} 
+                          onChange={(e) => setDetailNewPassword(e.target.value)} 
+                          minLength={6} 
+                          className="h-9 bg-white/5 border-purple-500/20 text-white flex-1" 
+                        />
+                        <Button size="sm" className="h-9 glass-button" onClick={handleDetailResetPassword}>
+                          <Check className="w-4 h-4 mr-1" />OK
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-9" onClick={() => { setDetailResetPassword(false); setDetailNewPassword('') }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-zinc-500 hover:text-zinc-300"
+                    onClick={() => setUserDetailOpen(false)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />Voir leur panneau (bientôt)
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }

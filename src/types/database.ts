@@ -17,7 +17,7 @@ export type Json =
 // ENUMS
 // =====================================================
 
-export type UserRole = 'admin' | 'affiliate'
+export type UserRole = 'super_admin' | 'admin' | 'affiliate'
 
 export type AffiliateStatus = 'active' | 'pending' | 'paused'
 
@@ -25,7 +25,7 @@ export type SaleStatus = 'pending' | 'paid' | 'cancelled' | 'refunded'
 
 export type CommissionStatus = 'pending' | 'paid' | 'cancelled'
 
-export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type PayoutStatus = 'pending' | 'paid' | 'failed'
 
 export type CommissionLevel = 1 | 2 | 3
 
@@ -41,6 +41,9 @@ export interface Profile {
   role: UserRole
   affiliate_code: string
   parent_id: string | null
+  paypal_email: string | null
+  subdomain: string | null
+  admin_id: string | null
   created_at: string
   updated_at: string
 }
@@ -100,11 +103,11 @@ export interface Commission {
 
 export interface Payout {
   id: string
+  admin_id: string
   affiliate_id: string
   amount: number
   status: PayoutStatus
-  payment_method: string
-  payment_details: Json
+  paypal_email: string | null
   created_at: string
   paid_at: string | null
 }
@@ -120,6 +123,19 @@ export interface Click {
   created_at: string
 }
 
+export interface Message {
+  id: string
+  sender_id: string
+  recipient_id: string | null
+  subject: string
+  content: string
+  is_broadcast: boolean
+  read_at: string | null
+  created_at: string
+  sender?: Profile
+  recipient?: Profile
+}
+
 // =====================================================
 // TABLE INSERT TYPES (for creating records)
 // =====================================================
@@ -132,6 +148,9 @@ export interface ProfileInsert {
   role?: UserRole
   affiliate_code?: string
   parent_id?: string | null
+  paypal_email?: string | null
+  subdomain?: string | null
+  admin_id?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -191,11 +210,11 @@ export interface CommissionInsert {
 
 export interface PayoutInsert {
   id?: string
+  admin_id: string
   affiliate_id: string
   amount: number
   status?: PayoutStatus
-  payment_method: string
-  payment_details?: Json
+  paypal_email?: string | null
   created_at?: string
   paid_at?: string | null
 }
@@ -208,6 +227,17 @@ export interface ClickInsert {
   user_agent?: string | null
   referrer_url?: string | null
   landing_url?: string | null
+  created_at?: string
+}
+
+export interface MessageInsert {
+  id?: string
+  sender_id: string
+  recipient_id?: string | null
+  subject: string
+  content: string
+  is_broadcast?: boolean
+  read_at?: string | null
   created_at?: string
 }
 
@@ -226,6 +256,8 @@ export type SaleUpdate = Partial<Omit<SaleInsert, 'id'>>
 export type CommissionUpdate = Partial<Omit<CommissionInsert, 'id'>>
 
 export type PayoutUpdate = Partial<Omit<PayoutInsert, 'id'>>
+
+export type MessageUpdate = Partial<Omit<MessageInsert, 'id'>>
 
 // =====================================================
 // RELATIONAL TYPES (for joins)
@@ -324,6 +356,11 @@ export interface Database {
         Insert: ClickInsert
         Update: Partial<ClickInsert>
       }
+      messages: {
+        Row: Message
+        Insert: MessageInsert
+        Update: MessageUpdate
+      }
     }
     Views: {
       affiliate_stats: {
@@ -346,6 +383,27 @@ export interface Database {
       get_pending_commissions: {
         Args: { affiliate_uuid: string }
         Returns: number
+      }
+      get_global_stats: {
+        Args: Record<string, never>
+        Returns: {
+          total_users: number
+          total_admins: number
+          total_affiliates: number
+          total_sales: number
+          total_revenue: number
+          pending_payouts: number
+          total_payouts: number
+        }
+      }
+      get_admin_stats: {
+        Args: { admin_uuid: string }
+        Returns: {
+          total_affiliates: number
+          total_sales: number
+          total_revenue: number
+          pending_payouts: number
+        }
       }
     }
     Enums: {

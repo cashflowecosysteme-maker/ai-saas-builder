@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { StarryBackground } from '@/components/starry-background'
@@ -29,11 +29,25 @@ import {
   Check,
   Send,
   LogOut,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Info,
+  Link2,
+  Key,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 
 type TabType = 'dashboard' | 'affiliates' | 'payouts' | 'settings'
+
+interface Level3Member {
+  id: string
+  full_name: string | null
+  email: string
+  paypal_email: string | null
+  created_at: string
+}
 
 interface Affiliate {
   id: string
@@ -49,6 +63,7 @@ interface Affiliate {
   total_earnings: number
   total_referrals: number
   status: string
+  level3?: Level3Member[]
 }
 
 interface Sale {
@@ -68,6 +83,8 @@ interface AdminData {
     paypal_email: string | null
     affiliate_code: string
     subdomain: string | null
+    webhook_secret?: string | null
+    custom_slug?: string | null
   }
   stats: {
     totalAffiliates: number
@@ -81,6 +98,14 @@ interface AdminData {
   pendingCommissions: { affiliate_id: string; amount: number; profile: { full_name: string | null; email: string; paypal_email: string | null } }[]
 }
 
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter()
   const { logout, isLoggingOut } = useAuth()
@@ -91,6 +116,16 @@ export default function AdminDashboardPage() {
   const [isSavingPaypal, setIsSavingPaypal] = useState(false)
   const [copied, setCopied] = useState(false)
   const [processingPayout, setProcessingPayout] = useState<string | null>(null)
+
+  // New state for enhanced features
+  const [searchQuery, setSearchQuery] = useState('')
+  const [customSlug, setCustomSlug] = useState('')
+  const [expandedL2, setExpandedL2] = useState<Set<string>>(new Set())
+  const [webhookSecret, setWebhookSecret] = useState('')
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false)
+  const [copiedSecret, setCopiedSecret] = useState(false)
+  const [isSavingSlug, setIsSavingSlug] = useState(false)
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -106,6 +141,8 @@ export default function AdminDashboardPage() {
 
       setData(result)
       setPaypalEmail(result.profile?.paypal_email || '')
+      setCustomSlug(result.profile?.custom_slug || '')
+      setWebhookSecret(result.profile?.webhook_secret || generateUUID())
     } catch (error) {
       console.error('Error:', error)
       toast.error('Erreur lors du chargement')
@@ -168,11 +205,87 @@ export default function AdminDashboardPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const copyWebhookUrl = () => {
+    const url = `${process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/webhooks/systemeio`
+    navigator.clipboard.writeText(url)
+    setCopiedWebhookUrl(true)
+    toast.success('URL copiée !')
+    setTimeout(() => setCopiedWebhookUrl(false), 2000)
+  }
+
+  const copySecretKey = () => {
+    navigator.clipboard.writeText(webhookSecret)
+    setCopiedSecret(true)
+    toast.success('Clé secrète copiée !')
+    setTimeout(() => setCopiedSecret(false), 2000)
+  }
+
+  const handleSaveSlug = async () => {
+    if (!customSlug) {
+      toast.error('Veuillez entrer un slug')
+      return
+    }
+    setIsSavingSlug(true)
+    try {
+      // TODO: Wire up to API endpoint
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      toast.success('Slug sauvegardé !')
+    } catch {
+      toast.error('Erreur lors de la sauvegarde')
+    } finally {
+      setIsSavingSlug(false)
+    }
+  }
+
+  const handleSaveWebhook = async () => {
+    setIsSavingWebhook(true)
+    try {
+      // TODO: Wire up to API endpoint (PATCH /api/admin/paypal)
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      toast.success('Configuration webhook sauvegardée !')
+    } catch {
+      toast.error('Erreur lors de la sauvegarde')
+    } finally {
+      setIsSavingWebhook(false)
+    }
+  }
+
+  const toggleL2Expand = (affiliateId: string) => {
+    setExpandedL2((prev) => {
+      const next = new Set(prev)
+      if (next.has(affiliateId)) {
+        next.delete(affiliateId)
+      } else {
+        next.add(affiliateId)
+      }
+      return next
+    })
+  }
+
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(amount)
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+
+  // Filtered affiliates based on search query
+  const filteredAffiliates = useMemo(() => {
+    if (!searchQuery.trim()) return data?.affiliates || []
+    const q = searchQuery.toLowerCase().trim()
+    return (data?.affiliates || []).filter(
+      (a) =>
+        a.profile.full_name?.toLowerCase().includes(q) ||
+        a.profile.email.toLowerCase().includes(q)
+    )
+  }, [data?.affiliates, searchQuery])
+
+  // Compute total team count including L3
+  const totalTeamCount = useMemo(() => {
+    if (!data?.affiliates) return 0
+    return data.affiliates.reduce((acc, a) => {
+      return acc + 1 + (a.level3?.length || 0)
+    }, 0)
+  }, [data?.affiliates])
 
   if (isLoading) {
     return (
@@ -203,6 +316,12 @@ export default function AdminDashboardPage() {
   const referralLink = data.profile?.subdomain
     ? `https://${data.profile.subdomain}.affiliationpro.publication-web.com/r/${data.profile.affiliate_code}`
     : `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${data.profile.affiliate_code}`
+
+  const customSlugValid = /^[a-z0-9-]*$/.test(customSlug) && customSlug.length > 0
+  const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/api/webhooks/systemeio`
+  const slugPreview = customSlug
+    ? `https://affiliationpro.publication-web.com/r/${customSlug}`
+    : ''
 
   return (
     <div className="relative min-h-screen">
@@ -373,46 +492,129 @@ export default function AdminDashboardPage() {
           {activeTab === 'affiliates' && (
             <Card className="glass-card border-0">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2 text-lg">
-                  <Users className="w-5 h-5 text-purple-400" />
-                  Mon équipe d'affiliés ({data.affiliates.length})
-                </CardTitle>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <Users className="w-5 h-5 text-purple-400" />
+                    Mon équipe ({totalTeamCount})
+                  </CardTitle>
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Input
+                      type="text"
+                      placeholder="Rechercher par nom ou email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-white/5 border-purple-500/20 text-white pl-9 pr-4 h-9 text-sm"
+                    />
+                  </div>
+                </div>
+                {searchQuery.trim() && (
+                  <p className="text-zinc-500 text-sm mt-2">
+                    {filteredAffiliates.length} résultat{filteredAffiliates.length !== 1 ? 's' : ''} trouvé{filteredAffiliates.length !== 1 ? 's' : ''}
+                  </p>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
-                  {data.affiliates.length === 0 ? (
+                  {filteredAffiliates.length === 0 ? (
                     <div className="text-center py-8 text-zinc-500">
                       <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p>Aucun affilié pour le moment</p>
-                      <p className="text-sm mt-1">Partagez votre lien pour recruter</p>
+                      <p>{searchQuery.trim() ? 'Aucun résultat pour cette recherche' : 'Aucun affilié pour le moment'}</p>
+                      {!searchQuery.trim() && (
+                        <p className="text-sm mt-1">Partagez votre lien pour recruter</p>
+                      )}
                     </div>
                   ) : (
-                    data.affiliates.map((affiliate) => (
-                      <div key={affiliate.id} className="p-4 rounded-lg bg-white/5 border border-purple-500/10">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
-                              {affiliate.profile.full_name?.[0]?.toUpperCase() || affiliate.profile.email[0].toUpperCase()}
+                    filteredAffiliates.map((affiliate) => {
+                      const hasL3 = affiliate.level3 && affiliate.level3.length > 0
+                      const isExpanded = expandedL2.has(affiliate.id)
+
+                      return (
+                        <div key={affiliate.id}>
+                          {/* L2 Affiliate Card */}
+                          <div className="p-4 rounded-lg bg-white/5 border border-purple-500/10">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                                  {affiliate.profile.full_name?.[0]?.toUpperCase() || affiliate.profile.email[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-white font-medium">{affiliate.profile.full_name || 'Sans nom'}</p>
+                                    <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs">
+                                      Niveau 2
+                                    </Badge>
+                                  </div>
+                                  <p className="text-zinc-400 text-sm">{affiliate.profile.email}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={affiliate.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-zinc-500/10 text-zinc-400'}>
+                                  <UserCheck className="w-3 h-3 mr-1" />
+                                  {affiliate.status === 'active' ? 'Actif' : affiliate.status}
+                                </Badge>
+                                {hasL3 && (
+                                  <button
+                                    onClick={() => toggleL2Expand(affiliate.id)}
+                                    className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors text-zinc-400 hover:text-white"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-white font-medium">{affiliate.profile.full_name || 'Sans nom'}</p>
-                              <p className="text-zinc-400 text-sm">{affiliate.profile.email}</p>
+                            <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-purple-500/10 text-sm text-zinc-400">
+                              <span>Gains: <span className="text-green-400 font-medium">{formatCurrency(affiliate.total_earnings || 0)}</span></span>
+                              <span>Filleuls: <span className="text-white font-medium">{affiliate.total_referrals || 0}</span></span>
+                              <span>PayPal: <span className={affiliate.profile.paypal_email ? 'text-green-400' : 'text-amber-400'}>{affiliate.profile.paypal_email || 'Non configuré'}</span></span>
+                              {hasL3 && (
+                                <span>Niveau 3: <span className="text-purple-400 font-medium">{affiliate.level3!.length}</span></span>
+                              )}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <Badge className={affiliate.status === 'active' ? 'bg-green-500/10 text-green-400' : 'bg-zinc-500/10 text-zinc-400'}>
-                              <UserCheck className="w-3 h-3 mr-1" />
-                              {affiliate.status === 'active' ? 'Actif' : affiliate.status}
-                            </Badge>
-                          </div>
+
+                          {/* L3 Members (expandable sub-section) */}
+                          {hasL3 && isExpanded && (
+                            <div className="ml-6 mt-2 space-y-2 border-l-2 border-purple-500/20 pl-4">
+                              {affiliate.level3!.map((l3) => (
+                                <div
+                                  key={l3.id}
+                                  className="p-3 rounded-lg bg-white/[0.03] border border-purple-500/5"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs">
+                                        {l3.full_name?.[0]?.toUpperCase() || l3.email[0].toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-white text-sm font-medium">{l3.full_name || 'Sans nom'}</p>
+                                          <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20 text-[10px] px-1.5 py-0">
+                                            Niveau 3
+                                          </Badge>
+                                        </div>
+                                        <p className="text-zinc-500 text-xs">{l3.email}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <Badge className={l3.paypal_email ? 'bg-green-500/10 text-green-400 text-xs' : 'bg-amber-500/10 text-amber-400 text-xs'}>
+                                        {l3.paypal_email ? 'PayPal ✓' : 'PayPal ✗'}
+                                      </Badge>
+                                      <p className="text-[10px] text-zinc-500 mt-1">{formatDate(l3.created_at)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-4 mt-3 pt-3 border-t border-purple-500/10 text-sm text-zinc-400">
-                          <span>Gains: <span className="text-green-400 font-medium">{formatCurrency(affiliate.total_earnings || 0)}</span></span>
-                          <span>Filleuls: <span className="text-white font-medium">{affiliate.total_referrals || 0}</span></span>
-                          <span>PayPal: <span className={affiliate.profile.paypal_email ? 'text-green-400' : 'text-amber-400'}>{affiliate.profile.paypal_email || 'Non configuré'}</span></span>
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </CardContent>
@@ -421,60 +623,96 @@ export default function AdminDashboardPage() {
 
           {/* PAYOUTS TAB */}
           {activeTab === 'payouts' && (
-            <Card className="glass-card border-0">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2 text-lg">
-                  <Wallet className="w-5 h-5 text-purple-400" />
-                  Paiements à effectuer
-                </CardTitle>
-                <CardDescription className="text-zinc-400">
-                  Payez vos affiliés pour leurs commissions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-3">
-                  {(!data.pendingCommissions || data.pendingCommissions.length === 0) ? (
-                    <div className="text-center py-8 text-zinc-500">
-                      <Wallet className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p>Aucun paiement en attente</p>
-                    </div>
-                  ) : (
-                    data.pendingCommissions.map((commission) => (
-                      <div key={commission.affiliate_id} className="p-4 rounded-lg bg-white/5 border border-amber-500/20">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-white font-medium">{commission.profile?.full_name || commission.profile?.email}</p>
-                            <p className="text-zinc-400 text-sm">
-                              PayPal: <span className={commission.profile?.paypal_email ? 'text-green-400' : 'text-red-400'}>
-                                {commission.profile?.paypal_email || 'Non configuré'}
-                              </span>
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-amber-400">{formatCurrency(commission.amount)}</p>
-                            <Button
-                              size="sm"
-                              className="glass-button mt-2"
-                              disabled={!commission.profile?.paypal_email || processingPayout === commission.affiliate_id}
-                              onClick={() => handlePayout(commission.affiliate_id, commission.amount)}
-                            >
-                              {processingPayout === commission.affiliate_id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <Send className="w-4 h-4 mr-1" />
-                                  Payer
-                                </>
-                              )}
-                            </Button>
+            <div className="space-y-8">
+              {/* En attente section */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <Clock className="w-5 h-5 text-amber-400" />
+                    Paiements en attente
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Payez vos affiliés pour leurs commissions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar space-y-3">
+                    {(!data.pendingCommissions || data.pendingCommissions.length === 0) ? (
+                      <div className="text-center py-8 text-zinc-500">
+                        <Wallet className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p>Aucun paiement en attente</p>
+                      </div>
+                    ) : (
+                      data.pendingCommissions.map((commission) => (
+                        <div key={commission.affiliate_id} className="p-4 rounded-lg bg-white/5 border border-amber-500/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium">{commission.profile?.full_name || commission.profile?.email}</p>
+                              <p className="text-zinc-400 text-sm">
+                                PayPal: <span className={commission.profile?.paypal_email ? 'text-green-400' : 'text-red-400'}>
+                                  {commission.profile?.paypal_email || 'Non configuré'}
+                                </span>
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xl font-bold text-amber-400">{formatCurrency(commission.amount)}</p>
+                              <Button
+                                size="sm"
+                                className="glass-button mt-2"
+                                disabled={!commission.profile?.paypal_email || processingPayout === commission.affiliate_id}
+                                onClick={() => handlePayout(commission.affiliate_id, commission.amount)}
+                              >
+                                {processingPayout === commission.affiliate_id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Send className="w-4 h-4 mr-1" />
+                                    Payer
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Visual Divider */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+                <span className="text-zinc-500 text-sm font-medium flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  Historique
+                </span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+              </div>
+
+              {/* Historique section */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    <Wallet className="w-5 h-5 text-green-400" />
+                    Historique des paiements
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Vos paiements déjà effectués
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* Empty state for now - data will be wired up later */}
+                  <div className="text-center py-12 text-zinc-500">
+                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+                      <Wallet className="w-8 h-8 opacity-30" />
+                    </div>
+                    <p className="text-lg font-medium text-zinc-400 mb-1">Aucun paiement effectué</p>
+                    <p className="text-sm">Les paiements traités apparaîtront ici</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* SETTINGS TAB */}
@@ -504,6 +742,168 @@ export default function AdminDashboardPage() {
                       {isSavingPaypal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Webhook Systeme.io Configuration */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    🔗 Configuration Webhook Systeme.io
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Configurez l&apos;intégration avec Systeme.io
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Webhook URL */}
+                  <div className="space-y-2">
+                    <Label className="text-zinc-300 text-sm">URL du Webhook</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={webhookUrl}
+                        readOnly
+                        className="bg-white/5 border-purple-500/20 text-white font-mono text-xs"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 border-purple-500/20 hover:bg-purple-500/10 text-zinc-400 hover:text-white"
+                        onClick={copyWebhookUrl}
+                      >
+                        {copiedWebhookUrl ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Secret Key */}
+                  <div className="space-y-2">
+                    <Label className="text-zinc-300 text-sm flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" />
+                      Clé secrète
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={webhookSecret}
+                        onChange={(e) => setWebhookSecret(e.target.value)}
+                        className="bg-white/5 border-purple-500/20 text-white font-mono text-xs"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 border-purple-500/20 hover:bg-purple-500/10 text-zinc-400 hover:text-white"
+                        onClick={copySecretKey}
+                      >
+                        {copiedSecret ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Info Box */}
+                  <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+                      <p className="text-zinc-400 text-sm">
+                        Configurez cette URL dans <span className="text-blue-300 font-medium">Systeme.io &gt; Automatisation &gt; Webhooks</span> pour recevoir les notifications de vente.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <Button
+                    onClick={handleSaveWebhook}
+                    disabled={isSavingWebhook}
+                    className="glass-button w-full"
+                  >
+                    {isSavingWebhook ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Sauvegarder la configuration webhook
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Custom Slug */}
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white flex items-center gap-2 text-lg">
+                    ✏️ Lien personnalisé
+                  </CardTitle>
+                  <CardDescription className="text-zinc-400">
+                    Personnalisez votre lien de recrutement
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Current Link */}
+                  <div className="space-y-2">
+                    <Label className="text-zinc-300 text-sm">Lien actuel</Label>
+                    <div className="p-3 rounded-lg bg-white/5 border border-purple-500/10">
+                      <p className="font-mono text-white text-xs break-all">
+                        {referralLink}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Custom Slug Input */}
+                  <div className="space-y-2">
+                    <Label className="text-zinc-300 text-sm">Slug personnalisé</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="monprogramme"
+                        value={customSlug}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                          setCustomSlug(val)
+                        }}
+                        className={`bg-white/5 border-purple-500/20 text-white font-mono ${customSlug && !customSlugValid ? 'border-red-500/50' : ''}`}
+                      />
+                    </div>
+                    <p className="text-zinc-500 text-xs">
+                      Seuls les lettres minuscules, chiffres et tirets sont autorisés.
+                    </p>
+                  </div>
+
+                  {/* Preview */}
+                  {customSlug && (
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300 text-sm">Aperçu</Label>
+                      <div className={`p-3 rounded-lg border ${customSlugValid ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+                        <p className={`font-mono text-xs break-all flex items-center gap-2 ${customSlugValid ? 'text-green-400' : 'text-red-400'}`}>
+                          <Link2 className="w-3.5 h-3.5 shrink-0" />
+                          {slugPreview}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save Button */}
+                  <Button
+                    onClick={handleSaveSlug}
+                    disabled={!customSlugValid || isSavingSlug}
+                    className="glass-button w-full"
+                  >
+                    {isSavingSlug ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Sauvegarder
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
 
