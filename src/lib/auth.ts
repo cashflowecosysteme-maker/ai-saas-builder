@@ -57,8 +57,10 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
       'raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
     )
 
+    const sigData = base64urlDecode(parts[2])
+    const msgData = encoder.encode(`${parts[0]}.${parts[1]}`)
     const valid = await crypto.subtle.verify(
-      'HMAC', key, base64urlDecode(parts[2]), encoder.encode(`${parts[0]}.${parts[1]}`)
+      'HMAC', key, sigData.buffer as ArrayBuffer, msgData.buffer as ArrayBuffer
     )
     if (!valid) return null
 
