@@ -1,5 +1,4 @@
 import { SignJWT, jwtVerify } from 'jose'
-import bcrypt from 'bcryptjs'
 
 export const COOKIE_NAME = 'affiliation-pro-session'
 
@@ -14,12 +13,31 @@ export interface SessionPayload {
   role: 'super_admin' | 'admin' | 'affiliate'
 }
 
+// Hash password using SHA-256 + salt (Web Crypto API - works in Workers)
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10)
+  const salt = crypto.randomUUID().replace(/-/g, '')
+  const encoder = new TextEncoder()
+  const data = encoder.encode(salt + password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  return `$sha256$${salt}$${hashHex}`
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash)
+export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  try {
+    const parts = storedHash.split('$')
+    if (parts.length !== 4 || parts[1] !== 'sha256') return false
+    const salt = parts[2]
+    const encoder = new TextEncoder()
+    const data = encoder.encode(salt + password)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    return hashHex === parts[3]
+  } catch {
+    return false
+  }
 }
 
 export async function createToken(payload: SessionPayload): Promise<string> {
@@ -46,13 +64,11 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
 }
 
 export function getSessionToken(request: Request): string | null {
-  // Check Authorization header first
   const authHeader = request.headers.get('Authorization')
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7)
   }
 
-  // Then check cookie
   const cookieHeader = request.headers.get('Cookie') || ''
   const cookies = cookieHeader.split(';').map(c => c.trim())
   const sessionCookie = cookies.find(c => c.startsWith(`${COOKIE_NAME}=`))

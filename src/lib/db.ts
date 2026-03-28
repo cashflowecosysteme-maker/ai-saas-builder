@@ -1,22 +1,33 @@
 // @ts-nocheck
-import { getCloudflareContext } from '@opennextjs/cloudflare'
+
+const cloudflareContextSymbol = Symbol.for("__cloudflare-context__");
 
 export type Database = any
 
-export async function getDB(): Promise<Database> {
-  const ctx = getCloudflareContext()
-  if (!ctx || !ctx.env.DB) {
-    throw new Error('D1 database not available')
-  }
-  return ctx.env.DB
+function getCloudflareContextFromGlobal() {
+  return (globalThis as any)[cloudflareContextSymbol]
 }
 
-export async function getEnv() {
-  const ctx = getCloudflareContext()
-  if (!ctx) {
-    throw new Error('Cloudflare context not available')
+export async function getDB(): Promise<Database> {
+  // Method 1: Try the opennextjs cloudflare context
+  try {
+    const ctx = getCloudflareContextFromGlobal()
+    if (ctx?.env?.DB) return ctx.env.DB
+  } catch {}
+
+  // Method 2: Try dynamic import of getCloudflareContext
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare')
+    const ctx = getCloudflareContext()
+    if (ctx?.env?.DB) return ctx.env.DB
+  } catch {}
+
+  // Method 3: Try process.env (some setups expose bindings here)
+  if ((globalThis as any).process?.env?.DB) {
+    return (globalThis as any).process.env.DB
   }
-  return ctx.env
+
+  throw new Error('D1 database not available in this context')
 }
 
 export function generateId(): string {
