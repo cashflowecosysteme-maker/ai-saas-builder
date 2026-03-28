@@ -1,6 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
-export type Database = D1Database
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Database = any
 
 export interface Env {
   DB: Database
