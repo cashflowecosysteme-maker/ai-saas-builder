@@ -1,10 +1,20 @@
-import { SignJWT, jwtVerify } from 'jose'
-
 export const COOKIE_NAME = 'affiliation-pro-session'
 
-function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || 'affiliation-pro-secret-change-in-production'
-  return new TextEncoder().encode(secret)
+function getSecret(): string {
+  return process.env.JWT_SECRET || 'affiliation-pro-secret-change-in-production'
+}
+
+function base64url(data: Uint8Array): string {
+  return btoa(String.fromCharCode(...data))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
+function base64urlDecode(str: string): Uint8Array {
+  str = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (str.length % 4) str += '='
+  return new Uint8Array(atob(str).split('').map(c => c.charCodeAt(0)))
 }
 
 export interface SessionPayload {
@@ -13,7 +23,62 @@ export interface SessionPayload {
   role: 'super_admin' | 'admin' | 'affiliate'
 }
 
-// Hash password using SHA-256 + salt (Web Crypto API - works in Workers)
+// Simple JWT using Web Crypto API (no external dependency)
+export async function createToken(payload: SessionPayload): Promise<string> {
+  const encoder = new TextEncoder()
+  const secret = encoder.encode(getSecret())
+
+  const key = await crypto.subtle.importKey(
+    'raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+
+  const header = base64url(encoder.encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })))
+  const now = Math.floor(Date.now() / 1000)
+  const body = base64url(encoder.encode(JSON.stringify({
+    ...payload,
+    iat: now,
+    exp: now + 7 * 24 * 60 * 60,
+  })))
+  const signature = base64url(
+    new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`${header}.${body}`)))
+  )
+
+  return `${header}.${body}.${signature}`
+}
+
+export async function verifyToken(token: string): Promise<SessionPayload | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+
+    const encoder = new TextEncoder()
+    const secret = encoder.encode(getSecret())
+
+    const key = await crypto.subtle.importKey(
+      'raw', secret, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    )
+
+    const valid = await crypto.subtle.verify(
+      'HMAC', key, base64urlDecode(parts[2]), encoder.encode(`${parts[0]}.${parts[1]}`)
+    )
+    if (!valid) return null
+
+    const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(parts[1])))
+    
+    // Check expiration
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null
+
+    return {
+      userId: payload.userId,
+      email: payload.email,
+      role: payload.role,
+    }
+  } catch {
+    return null
+  }
+}
+
+// Password hashing using SHA-256 + salt (Web Crypto API - native in Workers)
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.randomUUID().replace(/-/g, '')
   const encoder = new TextEncoder()
@@ -37,29 +102,6 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     return hashHex === parts[3]
   } catch {
     return false
-  }
-}
-
-export async function createToken(payload: SessionPayload): Promise<string> {
-  const secret = getSecret()
-  return new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('7d')
-    .sign(secret)
-}
-
-export async function verifyToken(token: string): Promise<SessionPayload | null> {
-  try {
-    const secret = getSecret()
-    const { payload } = await jwtVerify(token, secret)
-    return {
-      userId: payload.userId as string,
-      email: payload.email as string,
-      role: payload.role as SessionPayload['role'],
-    }
-  } catch {
-    return null
   }
 }
 
