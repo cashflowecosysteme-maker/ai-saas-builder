@@ -1,3 +1,16 @@
 name = "affiliation-pro"
-compatibility_date = "2024-01-01"
-pages_build_output_dir = ".vercel/output/static"
+main = ".open-next/worker.js"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+
+# Supabase environment variables (for local dev with wrangler)
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://fttmwpqzvadndqbfyhot.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_6NszuoKDhY_j63d_cDjoBw_nj31WVrR"
+NEXT_PUBLIC_SITE_URL = "https://affiliationpro.publication-web.com"
+
+# Secret env vars (set via: npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY)
+# SUPABASE_SERVICE_ROLE_KEY = "sb_secret_..."
