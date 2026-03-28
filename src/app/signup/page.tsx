@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Sparkles, Loader2, CheckCircle, UserPlus, Gift } from 'lucide-react'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
+import { signup } from '@/lib/auth-client'
 
 function SignupForm() {
   const router = useRouter()
@@ -25,7 +25,6 @@ function SignupForm() {
     referralCode: '',
   })
 
-  // Get referral code from URL
   useEffect(() => {
     const ref = searchParams.get('ref')
     if (ref) {
@@ -38,84 +37,32 @@ function SignupForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
-
-      // Step 1: Create auth user via Supabase client (works in browser)
-      const { data, error } = await supabase.auth.signUp({
+      const result = await signup({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            referral_code: formData.referralCode || null,
-          },
-        },
+        fullName: formData.fullName,
+        referralCode: formData.referralCode || undefined,
       })
 
-      if (error) {
-        throw error
+      if (!result.success) {
+        toast.error(result.error || 'Erreur lors de l\'inscription')
+        return
       }
 
-      if (!data.user) {
-        throw new Error('Erreur lors de la création du compte. Réessaie.')
-      }
-
-      // Step 2: Create/update profile via API (uses service role key)
-      try {
-        const apiRes = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            fullName: formData.fullName,
-            referralCode: formData.referralCode || undefined,
-            userId: data.user.id,
-          }),
-        })
-
-        if (apiRes.ok) {
-          const apiData = await apiRes.json()
-          console.log('Profile created/updated:', apiData.success)
-        } else {
-          // API returned an error - try to parse as JSON
-          let errorMsg = 'Problème avec le profil (non critique)'
-          try {
-            const apiData = await apiRes.json()
-            errorMsg = apiData.error || errorMsg
-          } catch {
-            errorMsg = 'Erreur serveur (problème de profil, non critique)'
-          }
-          console.warn('Profile API warning:', errorMsg)
-        }
-      } catch (apiErr) {
-        // API call failed (network error, not JSON, etc.) - not critical
-        console.warn('Profile API call failed (non-critical):', apiErr)
-      }
-
-      // Step 3: Success
       setIsSuccess(true)
       toast.success('Compte créé avec succès !')
 
-      // Step 4: Redirect to appropriate dashboard after short delay
-      setTimeout(async () => {
-        try {
-          const profileRes = await fetch('/api/dashboard')
-          if (!profileRes.ok) throw new Error('dashboard fetch failed')
-          const profileData = await profileRes.json()
-
-          if (profileData.isSuperAdmin) {
-            router.push('/super-admin')
-          } else if (profileData.isAdmin) {
-            router.push('/admin')
-          } else {
-            router.push('/dashboard')
-          }
-        } catch {
-          router.push('/login')
+      // Redirect based on role
+      setTimeout(() => {
+        if (result.user?.role === 'super_admin') {
+          router.push('/super-admin')
+        } else if (result.user?.role === 'admin') {
+          router.push('/admin')
+        } else {
+          router.push('/dashboard')
         }
       }, 1500)
     } catch (error: any) {
-      console.error('Signup error:', error)
       toast.error(error.message || 'Erreur lors de l\'inscription')
     } finally {
       setIsLoading(false)
@@ -244,7 +191,6 @@ function SignupForm() {
           </Link>
         </div>
 
-        {/* Benefits */}
         <div className="mt-6 pt-6 border-t border-purple-500/10">
           <p className="text-xs text-zinc-500 text-center mb-3">En créant un compte, tu obtiens :</p>
           <div className="flex flex-wrap justify-center gap-2">

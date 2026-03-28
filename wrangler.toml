@@ -6,11 +6,16 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = ".open-next/assets"
 
-# Supabase environment variables (for local dev with wrangler)
-[vars]
-NEXT_PUBLIC_SUPABASE_URL = "https://fttmwpqzvadndqbfyhot.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_6NszuoKDhY_j63d_cDjoBw_nj31WVrR"
-NEXT_PUBLIC_SITE_URL = "https://affiliationpro.publication-web.com"
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "affiliation-pro-db"
+database_id = "PLACEHOLDER_D1_ID"
 
-# Secret env vars (set via: npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY)
-# SUPABASE_SERVICE_ROLE_KEY = "sb_secret_..."
+# Environment variables
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://affiliation-pro.cashflowecosysteme.workers.dev"
+JWT_SECRET = "affiliation-pro-jwt-secret-2026-secure"
+
+# Secrets (set via wrangler or Cloudflare dashboard):
+# SUPABASE_SERVICE_ROLE_KEY (for backward compatibility, not used with D1)

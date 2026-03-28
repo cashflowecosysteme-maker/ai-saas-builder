@@ -1,20 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { logout } from '@/lib/auth-client'
 
 export default function LogoutPage() {
   useEffect(() => {
-    const logout = async () => {
-      const supabase = createClient()
-      
-      // Sign out from Supabase - this clears the session properly
-      await supabase.auth.signOut({ scope: 'global' })
-      
-      // Redirect to home
-      window.location.href = '/'
-    }
-    
     logout()
   }, [])
 

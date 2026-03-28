@@ -1,36 +1,27 @@
-import { createServerClient } from '@supabase/ssr'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, type NextRequest } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDB } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = createAdminClient() as any
-    const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type') || 'users'
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return request.cookies.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          },
-        },
-      }
-    )
-
-    // Verify super admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const session = await getSession(request)
+    if (!session) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
+    const db = await getDB()
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type') || 'users'
+
+    // Verify super admin
+    const profile = await db
+      .prepare('SELECT role FROM users WHERE id = ?')
+      .bind(session.userId)
+      .first<any>()
+
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
@@ -38,26 +29,29 @@ export async function GET(request: NextRequest) {
     let csv = ''
 
     if (type === 'users') {
-      const { data: users } = await admin
-        .from('profiles')
-        .select('email, full_name, role, affiliate_code, paypal_email, subdomain, created_at')
-        .order('created_at', { ascending: false })
+      const usersResult = await db
+        .prepare('SELECT email, full_name, role, affiliate_code, paypal_email, subdomain, created_at FROM users ORDER BY created_at DESC')
+        .all<any>()
+      const users = usersResult.results || []
 
       csv = 'Email,Nom,Rôle,Code Affiliation,PayPal,Sous-domaine,Date inscription\n'
-      users?.forEach((u: any) => {
+      users.forEach((u: any) => {
         csv += `"${u.email}","${u.full_name || ''}","${u.role}","${u.affiliate_code}","${u.paypal_email || ''}","${u.subdomain || ''}","${u.created_at}"\n`
       })
     } else if (type === 'sales') {
-      const { data: sales } = await admin
-        .from('sales')
-        .select('amount, status, commission_l1, commission_l2, commission_l3, customer_email, created_at, affiliates(profiles(email, full_name))')
-        .order('created_at', { ascending: false })
+      const salesResult = await db
+        .prepare(`SELECT s.amount, s.status, s.commission_l1, s.commission_l2, s.commission_l3, s.customer_email, s.created_at,
+          u.email as affiliate_email, u.full_name as affiliate_name
+          FROM sales s
+          JOIN affiliates a ON s.affiliate_id = a.id
+          JOIN users u ON a.user_id = u.id
+          ORDER BY s.created_at DESC`)
+        .all<any>()
+      const sales = salesResult.results || []
 
       csv = 'Montant,Statut,Commission L1,Commission L2,Commission L3,Client Email,Affilié,Date\n'
-      sales?.forEach((s: any) => {
-        const affiliateEmail = s.affiliates?.profiles?.email || ''
-        const affiliateName = s.affiliates?.profiles?.full_name || ''
-        csv += `"${s.amount}","${s.status}","${s.commission_l1}","${s.commission_l2}","${s.commission_l3}","${s.customer_email || ''}","${affiliateName} (${affiliateEmail})","${s.created_at}"\n`
+      sales.forEach((s: any) => {
+        csv += `"${s.amount}","${s.status}","${s.commission_l1}","${s.commission_l2}","${s.commission_l3}","${s.customer_email || ''}","${s.affiliate_name || ''} (${s.affiliate_email || ''})","${s.created_at}"\n`
       })
     }
 

@@ -1,35 +1,25 @@
-import { createServerClient } from '@supabase/ssr'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, type NextRequest } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDB, generateId } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = createAdminClient() as any
-
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return request.cookies.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          },
-        },
-      }
-    )
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const session = await getSession(request)
+    if (!session) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
+    const db = await getDB()
+
     // Check if super admin
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
+    const profile = await db
+      .prepare('SELECT role FROM users WHERE id = ?')
+      .bind(session.userId)
+      .first<any>()
+
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
@@ -40,26 +30,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sujet et contenu requis' }, { status: 400 })
     }
 
+    const now = new Date().toISOString()
+
     if (isBroadcast) {
-      // Get all users
-      const { data: users } = await admin
-        .from('profiles')
-        .select('id')
-        .neq('id', user.id)
+      // Get all users except current
+      const usersResult = await db
+        .prepare('SELECT id FROM users WHERE id != ?')
+        .bind(session.userId)
+        .all<{ id: string }>()
+      const users = usersResult.results || []
 
-      if (users && users.length > 0) {
+      if (users.length > 0) {
         // Create individual messages for each user
-        const messages = users.map((u: { id: string }) => ({
-          sender_id: user.id,
-          recipient_id: u.id,
-          subject,
-          content,
-          is_broadcast: true,
-        }))
-
-        const { error } = await admin.from('messages').insert(messages)
-        if (error) {
-          return NextResponse.json({ error: error.message }, { status: 500 })
+        const stmts = users.map((u) =>
+          db
+            .prepare('INSERT INTO messages (id, sender_id, recipient_id, subject, content, is_broadcast, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .bind(generateId(), session.userId, u.id, subject, content, 1, now)
+        )
+        // Execute sequentially
+        for (const stmt of stmts) {
+          await stmt.run()
         }
       }
     } else {
@@ -67,17 +57,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Destinataire requis' }, { status: 400 })
       }
 
-      const { error } = await admin.from('messages').insert({
-        sender_id: user.id,
-        recipient_id: recipientId,
-        subject,
-        content,
-        is_broadcast: false,
-      })
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
+      await db
+        .prepare('INSERT INTO messages (id, sender_id, recipient_id, subject, content, is_broadcast, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), session.userId, recipientId, subject, content, 0, now)
+        .run()
     }
 
     return NextResponse.json({ success: true })

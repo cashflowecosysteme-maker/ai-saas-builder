@@ -1,96 +1,93 @@
-import { createServerClient } from '@supabase/ssr'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, type NextRequest } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDB } from '@/lib/db'
+import { getSession } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = createAdminClient() as any
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const db = await getDB()
     const { searchParams } = new URL(request.url)
     const rawSearch = searchParams.get('search') || ''
     // Sanitize search input to prevent SQL injection
     const search = rawSearch.replace(/[%'\\]/g, '')
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return request.cookies.getAll() },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          },
-        },
-      }
-    )
-
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
-    }
-
     // Check if super admin
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const profile = await db
+      .prepare('SELECT role FROM users WHERE id = ?')
+      .bind(session.userId)
+      .first<any>()
 
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     // Get global stats
-    const { count: totalUsers } = await admin.from('profiles').select('*', { count: 'exact', head: true })
-    const { count: totalAdmins } = await admin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin')
-    const { count: totalAffiliates } = await admin.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'affiliate')
-    const { count: totalSales } = await admin.from('sales').select('*', { count: 'exact', head: true })
-    const { data: revenueData } = await admin.from('sales').select('amount')
-    const totalRevenue = revenueData?.reduce((sum: number, s: any) => sum + Number(s.amount), 0) || 0
-    const { data: pendingData } = await admin.from('commissions').select('amount').eq('status', 'pending')
-    const pendingPayouts = pendingData?.reduce((sum: number, c: any) => sum + Number(c.amount), 0) || 0
-    const { data: paidData } = await admin.from('payouts').select('amount').eq('status', 'paid')
-    const totalPayouts = paidData?.reduce((sum: number, p: any) => sum + Number(p.amount), 0) || 0
+    const totalUsersResult = await db.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
+    const totalAdminsResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").first<{ count: number }>()
+    const totalAffiliatesResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'affiliate'").first<{ count: number }>()
+    const totalSalesResult = await db.prepare('SELECT COUNT(*) as count FROM sales').first<{ count: number }>()
+
+    const revenueResult = await db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM sales').first<{ total: number }>()
+    const totalRevenue = revenueResult?.total || 0
+
+    const pendingResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE status = 'pending'").first<{ total: number }>()
+    const pendingPayouts = pendingResult?.total || 0
+
+    const paidResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payouts WHERE status = 'paid'").first<{ total: number }>()
+    const totalPayouts = paidResult?.total || 0
 
     // Get all admins
-    const adminsQuery = admin
-      .from('profiles')
-      .select('id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, webhook_secret, created_at')
-      .eq('role', 'admin')
+    let adminsResult
     if (search) {
-      adminsQuery.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+      adminsResult = await db
+        .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at FROM users WHERE role = 'admin' AND (email LIKE ? OR full_name LIKE ?) ORDER BY created_at DESC")
+        .bind(`%${search}%`, `%${search}%`)
+        .all<any>()
+    } else {
+      adminsResult = await db
+        .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at FROM users WHERE role = 'admin' ORDER BY created_at DESC")
+        .all<any>()
     }
-    const { data: admins } = await adminsQuery.order('created_at', { ascending: false })
+    const admins = adminsResult.results || []
 
     // Build teams structure: Admin -> Level 2 (their affiliates) -> Level 3
-    const teams = []
-    
-    for (const adminUser of (admins || [])) {
-      // Get level 2 affiliates (parent_id = admin.id)
-      const level2Query = admin
-        .from('profiles')
-        .select('id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at')
-        .eq('parent_id', adminUser.id)
+    const teams: any[] = []
+
+    for (const adminUser of admins) {
+      // Get level 2 affiliates (admin_id = admin.id)
+      let level2Result
       if (search) {
-        level2Query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+        level2Result = await db
+          .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE admin_id = ? AND (email LIKE ? OR full_name LIKE ?)")
+          .bind(adminUser.id, `%${search}%`, `%${search}%`)
+          .all<any>()
+      } else {
+        level2Result = await db
+          .prepare('SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE admin_id = ?')
+          .bind(adminUser.id)
+          .all<any>()
       }
-      const { data: level2 } = await level2Query
+      const level2 = level2Result.results || []
 
       // For each L2, get their L3 members
-      const level2WithL3 = []
-      for (const l2 of (level2 || [])) {
-        const { data: level3 } = await admin
-          .from('profiles')
-          .select('id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at')
-          .eq('parent_id', l2.id)
+      const level2WithL3: any[] = []
+      for (const l2 of level2) {
+        const l3Result = await db
+          .prepare('SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE parent_id = ?')
+          .bind(l2.id)
+          .all<any>()
+        const level3 = l3Result.results || []
 
         level2WithL3.push({
           ...l2,
-          level3: level3 || [],
+          level3,
         })
       }
 
@@ -101,36 +98,86 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get recent sales
-    const { data: recentSales } = await admin
-      .from('sales')
-      .select('id, amount, status, created_at, commission_l1, customer_email, affiliates(id, user_id, profile:profiles(full_name, email, role))')
-      .order('created_at', { ascending: false })
-      .limit(20)
+    // Get recent sales with affiliate info
+    const recentSalesResult = await db
+      .prepare(`SELECT s.id, s.amount, s.status, s.created_at, s.commission_l1, s.customer_email,
+        a.id as affiliate_id, a.user_id as affiliate_user_id,
+        u.full_name as affiliate_name, u.email as affiliate_email, u.role as affiliate_role
+        FROM sales s
+        JOIN affiliates a ON s.affiliate_id = a.id
+        JOIN users u ON a.user_id = u.id
+        ORDER BY s.created_at DESC LIMIT 20`)
+      .all<any>()
+    const recentSales = (recentSalesResult.results || []).map((s: any) => ({
+      id: s.id,
+      amount: s.amount,
+      status: s.status,
+      created_at: s.created_at,
+      commission_l1: s.commission_l1,
+      customer_email: s.customer_email,
+      affiliates: {
+        id: s.affiliate_id,
+        user_id: s.affiliate_user_id,
+        profile: {
+          full_name: s.affiliate_name,
+          email: s.affiliate_email,
+          role: s.affiliate_role,
+        },
+      },
+    }))
 
-    // Get messages
-    const messagesQuery = admin
-      .from('messages')
-      .select('id, subject, content, sender_id, recipient_id, is_broadcast, created_at, read_at, sender:profiles!messages_sender_id_fkey(full_name, email), recipient:profiles!messages_recipient_id_fkey(full_name, email)')
+    // Get messages with sender/recipient info
+    let messagesResult
     if (search) {
-      messagesQuery.or(`subject.ilike.%${search}%,content.ilike.%${search}%`)
+      messagesResult = await db
+        .prepare(`SELECT m.id, m.subject, m.content, m.sender_id, m.recipient_id, m.is_broadcast, m.created_at, m.read_at,
+          su.full_name as sender_name, su.email as sender_email,
+          ru.full_name as recipient_name, ru.email as recipient_email
+          FROM messages m
+          JOIN users su ON m.sender_id = su.id
+          JOIN users ru ON m.recipient_id = ru.id
+          WHERE (m.subject LIKE ? OR m.content LIKE ?)
+          ORDER BY m.created_at DESC LIMIT 50`)
+        .bind(`%${search}%`, `%${search}%`)
+        .all<any>()
+    } else {
+      messagesResult = await db
+        .prepare(`SELECT m.id, m.subject, m.content, m.sender_id, m.recipient_id, m.is_broadcast, m.created_at, m.read_at,
+          su.full_name as sender_name, su.email as sender_email,
+          ru.full_name as recipient_name, ru.email as recipient_email
+          FROM messages m
+          JOIN users su ON m.sender_id = su.id
+          JOIN users ru ON m.recipient_id = ru.id
+          ORDER BY m.created_at DESC LIMIT 50`)
+        .all<any>()
     }
-    const { data: messages } = await messagesQuery.order('created_at', { ascending: false }).limit(50)
+    const messages = (messagesResult.results || []).map((m: any) => ({
+      id: m.id,
+      subject: m.subject,
+      content: m.content,
+      sender_id: m.sender_id,
+      recipient_id: m.recipient_id,
+      is_broadcast: m.is_broadcast,
+      created_at: m.created_at,
+      read_at: m.read_at,
+      sender: { full_name: m.sender_name, email: m.sender_email },
+      recipient: { full_name: m.recipient_name, email: m.recipient_email },
+    }))
 
     return NextResponse.json({
       stats: {
-        totalUsers: totalUsers || 0,
-        totalAdmins: totalAdmins || 0,
-        totalAffiliates: totalAffiliates || 0,
-        totalSales: totalSales || 0,
+        totalUsers: totalUsersResult?.count || 0,
+        totalAdmins: totalAdminsResult?.count || 0,
+        totalAffiliates: totalAffiliatesResult?.count || 0,
+        totalSales: totalSalesResult?.count || 0,
         totalRevenue,
         pendingPayouts,
         totalPayouts,
       },
-      admins: admins || [],
+      admins,
       teams,
-      recentSales: recentSales || [],
-      messages: messages || [],
+      recentSales,
+      messages,
     })
   } catch (error) {
     console.error('Super admin error:', error)

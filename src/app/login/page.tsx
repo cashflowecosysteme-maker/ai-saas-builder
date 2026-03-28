@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Sparkles, Loader2, LogIn } from 'lucide-react'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
+import { login } from '@/lib/auth-client'
 
 function LoginForm() {
   const router = useRouter()
@@ -35,36 +35,29 @@ function LoginForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const result = await login({
         email: formData.email,
         password: formData.password,
       })
 
-      if (error) {
-        throw error
+      if (!result.success) {
+        toast.error(result.error || 'Erreur de connexion')
+        return
       }
 
-      if (data.user) {
-        toast.success('Connexion réussie !')
+      toast.success('Connexion réussie !')
 
-        // Check user role and redirect
-        const profileRes = await fetch('/api/dashboard')
-        const profileData = await profileRes.json()
-
-        if (profileData.isSuperAdmin) {
-          router.push('/super-admin')
-        } else if (profileData.isAdmin) {
-          router.push('/admin')
-        } else if (redirectTo) {
-          router.push(redirectTo)
-        } else {
-          router.push('/dashboard')
-        }
+      // Redirect based on role
+      if (result.user?.role === 'super_admin') {
+        router.push('/super-admin')
+      } else if (result.user?.role === 'admin') {
+        router.push('/admin')
+      } else if (redirectTo) {
+        router.push(redirectTo)
+      } else {
+        router.push('/dashboard')
       }
     } catch (error: any) {
-      console.error('Login error:', error)
       toast.error(error.message || 'Erreur de connexion')
     } finally {
       setIsLoading(false)
@@ -135,13 +128,13 @@ function LoginForm() {
         <div className="mt-6 text-center text-sm text-zinc-400">
           Pas encore de compte ?{' '}
           <Link href="/signup" className="text-purple-400 hover:text-purple-300 font-medium">
-            S'inscrire gratuitement
+            S&apos;inscrire gratuitement
           </Link>
         </div>
 
         <div className="mt-4 text-center text-xs text-zinc-500">
           <Link href="/" className="hover:text-zinc-400">
-            ← Retour à l'accueil
+            ← Retour à l&apos;accueil
           </Link>
         </div>
       </CardContent>

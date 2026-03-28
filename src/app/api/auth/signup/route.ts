@@ -1,188 +1,103 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getDB, generateId, generateUniqueAffiliateCode } from '@/lib/db'
+import { hashPassword, createToken, createSessionCookie, verifyPassword } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
-
-function generateAffiliateCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let code = ''
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return code
-}
 
 export async function POST(request: Request) {
   try {
-    const { email, fullName, referralCode, userId } = await request.json()
+    const { email, password, fullName, referralCode } = await request.json()
 
-    if (!userId || !email || !fullName) {
-      return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
+    if (!email || !password || !fullName) {
+      return NextResponse.json({ error: 'Email, mot de passe et nom sont requis' }, { status: 400 })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error('Missing Supabase env vars')
-      return NextResponse.json({ error: 'Configuration serveur manquante' }, { status: 500 })
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Le mot de passe doit contenir au moins 6 caractères' }, { status: 400 })
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
+    const db = await getDB()
 
-    // Check if profile already exists (trigger may have created it)
-    const { data: existingProfile, error: checkError } = await supabase
-      .from('profiles')
-      .select('id, affiliate_code, parent_id')
-      .eq('id', userId)
-      .maybeSingle()
+    // Check if email already exists
+    const existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email.toLowerCase()).first()
+    if (existing) {
+      return NextResponse.json({ error: 'Cet email est déjà utilisé. Connecte-toi plutôt.' }, { status: 409 })
+    }
+
+    // Generate unique affiliate code
+    const affiliateCode = await generateUniqueAffiliateCode(db)
 
     // Find parent by referral code
     let parentId: string | null = null
     let parentAffiliateId: string | null = null
     let grandparentAffiliateId: string | null = null
+    let adminId: string | null = null
 
     if (referralCode) {
-      const { data: parentProfile } = await supabase
-        .from('profiles')
-        .select('id, affiliate_code, admin_id')
-        .eq('affiliate_code', referralCode.toUpperCase())
-        .maybeSingle()
+      const parent = await db
+        .prepare('SELECT id, admin_id FROM users WHERE affiliate_code = ?')
+        .bind(referralCode.toUpperCase())
+        .first<{ id: string; admin_id: string | null }>()
 
-      if (parentProfile) {
-        parentId = parentProfile.id
-        const { data: parentAff } = await supabase
-          .from('affiliates')
-          .select('id, parent_affiliate_id')
-          .eq('user_id', parentProfile.id)
-          .maybeSingle()
+      if (parent) {
+        parentId = parent.id
+        adminId = parent.admin_id
+
+        // Find parent's affiliate record
+        const parentAff = await db
+          .prepare('SELECT id, parent_affiliate_id FROM affiliates WHERE user_id = ?')
+          .bind(parent.id)
+          .first<{ id: string; parent_affiliate_id: string | null }>()
+
         if (parentAff) {
           parentAffiliateId = parentAff.id
           grandparentAffiliateId = parentAff.parent_affiliate_id
         }
-      }
-    }
 
-    // Generate unique affiliate code
-    let affiliateCode = existingProfile?.affiliate_code || generateAffiliateCode()
-    if (!existingProfile?.affiliate_code) {
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const { data: dup } = await supabase
-          .from('profiles')
-          .select('affiliate_code')
-          .eq('affiliate_code', affiliateCode)
-          .maybeSingle()
-        if (!dup) break
-        affiliateCode = generateAffiliateCode()
-      }
-    }
-
-    // Create or update profile
-    if (existingProfile) {
-      // UPDATE existing profile (created by trigger)
-      const updateData: Record<string, any> = {
-        email,
-        full_name: fullName,
-        affiliate_code: affiliateCode,
-      }
-      if (parentId && !existingProfile.parent_id) {
-        updateData.parent_id = parentId
-      }
-
-      const { error: updateErr } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', userId)
-
-      if (updateErr) {
-        console.error('Profile update error:', updateErr.message)
-      }
-    } else {
-      // INSERT new profile (trigger may not exist)
-      const profileData: Record<string, any> = {
-        id: userId,
-        email,
-        full_name: fullName,
-        role: 'affiliate',
-        affiliate_code: affiliateCode,
-        parent_id: parentId,
-      }
-
-      const { error: insertErr } = await supabase
-        .from('profiles')
-        .insert(profileData)
-
-      if (insertErr) {
-        console.error('Profile insert error:', insertErr.message)
-        // Try without optional fields that might not exist
-        if (insertErr.message?.includes('column') || insertErr.message?.includes('does not exist')) {
-          const minimal: Record<string, any> = {
-            id: userId,
-            email,
-            full_name: fullName,
-            role: 'affiliate',
-            affiliate_code: affiliateCode,
-          }
-          const retry = await supabase.from('profiles').insert(minimal)
-          if (retry.error) {
-            console.error('Profile retry error:', retry.error.message)
-          }
-        }
-      }
-
-      // Try admin_id separately (might not exist in schema)
-      if (parentId) {
-        try {
-          const adminId = await getAdminId(supabase, parentId)
-          if (adminId) {
-            await supabase.from('profiles').update({ admin_id: adminId }).eq('id', userId)
-          }
-        } catch {
-          // Skip if column doesn't exist
+        // Walk up parent chain to find admin
+        if (!adminId) {
+          adminId = await findAdminId(db, parent.id)
         }
       }
     }
+
+    // Hash password
+    const passwordHash = await hashPassword(password)
+
+    // Create user
+    const userId = generateId()
+    await db.prepare(`
+      INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, parent_id, admin_id)
+      VALUES (?, ?, ?, ?, 'affiliate', ?, ?, ?)
+    `).bind(userId, email.toLowerCase(), passwordHash, fullName, affiliateCode, parentId, adminId).run()
 
     // Create affiliate record if program exists
-    const { data: program } = await supabase
-      .from('programs')
-      .select('id')
-      .eq('is_active', true)
-      .maybeSingle()
+    const program = await db
+      .prepare('SELECT id FROM programs WHERE is_active = 1 LIMIT 1')
+      .first<{ id: string }>()
 
     if (program) {
-      const { data: existingAff } = await supabase
-        .from('affiliates')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('program_id', program.id)
-        .maybeSingle()
-
-      if (!existingAff) {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliation-pro.cashflowecosysteme.workers.dev'
-        const { error: affErr } = await supabase.from('affiliates').insert({
-          program_id: program.id,
-          user_id: userId,
-          affiliate_link: `${siteUrl}/r/${affiliateCode}`,
-          parent_affiliate_id: parentAffiliateId,
-          grandparent_affiliate_id: grandparentAffiliateId,
-          status: 'active',
-        })
-        if (affErr) {
-          console.error('Affiliate record error:', affErr.message)
-        }
-      }
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliation-pro.cashflowecosysteme.workers.dev'
+      const affiliateId = generateId()
+      await db.prepare(`
+        INSERT INTO affiliates (id, program_id, user_id, affiliate_link, parent_affiliate_id, grandparent_affiliate_id, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'active')
+      `).bind(affiliateId, program.id, userId, `${siteUrl}/r/${affiliateCode}`, parentAffiliateId, grandparentAffiliateId).run()
     }
 
-    return NextResponse.json({
+    // Create JWT token
+    const token = await createToken({ userId, email: email.toLowerCase(), role: 'affiliate' })
+
+    // Return success with session cookie
+    const response = NextResponse.json({
       success: true,
-      user: { id: userId, email, full_name: fullName, affiliate_code: affiliateCode },
+      user: { id: userId, email: email.toLowerCase(), full_name: fullName, affiliate_code: affiliateCode, role: 'affiliate' },
     })
+
+    response.headers.append('Set-Cookie', createSessionCookie(token))
+    return response
   } catch (error: any) {
-    console.error('Signup API error:', error?.message || error)
+    console.error('Signup error:', error?.message || error)
     return NextResponse.json(
       { error: 'Erreur serveur: ' + (error?.message || 'Veuillez réessayer.') },
       { status: 500 }
@@ -190,14 +105,13 @@ export async function POST(request: Request) {
   }
 }
 
-async function getAdminId(supabase: any, profileId: string): Promise<string | null> {
+async function findAdminId(db: D1Database, profileId: string): Promise<string | null> {
   let currentId = profileId
   for (let i = 0; i < 5; i++) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, role, parent_id, admin_id')
-      .eq('id', currentId)
-      .maybeSingle()
+    const profile = await db
+      .prepare('SELECT id, role, parent_id, admin_id FROM users WHERE id = ?')
+      .bind(currentId)
+      .first<{ id: string; role: string; parent_id: string | null; admin_id: string | null }>()
     if (!profile) return null
     if (profile.role === 'admin') return profile.id
     if (profile.admin_id) return profile.admin_id

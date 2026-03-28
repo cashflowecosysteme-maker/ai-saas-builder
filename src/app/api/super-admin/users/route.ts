@@ -1,42 +1,24 @@
-import { createServerClient } from '@supabase/ssr'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse, type NextRequest } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDB, generateId, generateUniqueAffiliateCode } from '@/lib/db'
+import { getSession, hashPassword } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
-
-// Generate affiliate code
-function generateAffiliateCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let code = ''
-  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length))
-  return code
-}
 
 // Verify super admin
 async function verifySuperAdmin(request: NextRequest) {
-  const admin = createAdminClient() as any
-  
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-        },
-      },
-    }
-  )
+  const session = await getSession(request)
+  if (!session) return { authorized: false }
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { authorized: false }
+  const db = await getDB()
+  const profile = await db
+    .prepare('SELECT role FROM users WHERE id = ?')
+    .bind(session.userId)
+    .first<any>()
 
-  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
   if (!profile || profile.role !== 'super_admin') return { authorized: false }
 
-  return { authorized: true, admin }
+  return { authorized: true, db, userId: session.userId }
 }
 
 // CREATE USER
@@ -46,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (!verification.authorized) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
-    const admin = verification.admin
+    const { db } = verification
 
     const { email, password, fullName, role, subdomain, adminId } = await request.json()
 
@@ -55,52 +37,58 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email exists
-    const { data: existing } = await admin.from('profiles').select('id').eq('email', email).single()
+    const existing = await db
+      .prepare('SELECT id FROM users WHERE email = ?')
+      .bind(email.toLowerCase())
+      .first()
     if (existing) {
       return NextResponse.json({ error: 'Un compte avec cet email existe déjà' }, { status: 400 })
     }
 
-    // Create user in Auth
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: fullName },
-    })
+    // Create user
+    const userId = generateId()
+    const affiliateCode = await generateUniqueAffiliateCode(db)
+    const passwordHash = await hashPassword(password)
+    const now = new Date().toISOString()
 
-    if (authError || !authData.user) {
-      return NextResponse.json({ error: authError?.message || 'Erreur création' }, { status: 400 })
-    }
-
-    const userId = authData.user.id
-    const affiliateCode = generateAffiliateCode()
-
-    // Create profile
-    const { error: profileError } = await admin.from('profiles').upsert({
-      id: userId,
-      email,
-      full_name: fullName,
-      role,
-      affiliate_code: affiliateCode,
-      subdomain: subdomain || null,
-      admin_id: role === 'affiliate' ? adminId : null,
-    }, { onConflict: 'id' })
-
-    if (profileError) {
-      await admin.auth.admin.deleteUser(userId)
-      return NextResponse.json({ error: 'Erreur profil: ' + profileError.message }, { status: 500 })
-    }
+    await db
+      .prepare('INSERT INTO users (id, email, password_hash, full_name, role, affiliate_code, subdomain, admin_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(
+        userId,
+        email.toLowerCase(),
+        passwordHash,
+        fullName,
+        role,
+        affiliateCode,
+        subdomain || null,
+        role === 'affiliate' ? adminId : null,
+        now,
+        now
+      )
+      .run()
 
     // Get default program and create affiliate record for admins
     if (role === 'admin') {
-      const { data: program } = await admin.from('programs').select('id').eq('is_active', true).single()
+      const program = await db
+        .prepare('SELECT id FROM programs WHERE is_active = ? LIMIT 1')
+        .bind(1)
+        .first<{ id: string }>()
       if (program) {
-        await admin.from('affiliates').insert({
-          program_id: program.id,
-          user_id: userId,
-          affiliate_link: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'}/r/${affiliateCode}`,
-          status: 'active',
-        })
+        const affiliateId = generateId()
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'
+        await db
+          .prepare('INSERT INTO affiliates (id, program_id, user_id, affiliate_link, status, total_earnings, total_referrals, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(
+            affiliateId,
+            program.id,
+            userId,
+            `${siteUrl}/r/${affiliateCode}`,
+            'active',
+            0,
+            0,
+            now
+          )
+          .run()
       }
     }
 
@@ -118,32 +106,26 @@ export async function PUT(request: NextRequest) {
     if (!verification.authorized) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
-    const admin = verification.admin
+    const { db } = verification
 
     const { userId, subdomain } = await request.json()
 
     // Check if subdomain is taken
     if (subdomain) {
-      const { data: existing } = await admin
-        .from('profiles')
-        .select('id')
-        .eq('subdomain', subdomain.toLowerCase())
-        .neq('id', userId)
-        .single()
+      const existing = await db
+        .prepare('SELECT id FROM users WHERE subdomain = ? AND id != ?')
+        .bind(subdomain.toLowerCase(), userId)
+        .first()
 
       if (existing) {
         return NextResponse.json({ error: 'Ce sous-domaine est déjà utilisé' }, { status: 400 })
       }
     }
 
-    const { error } = await admin
-      .from('profiles')
-      .update({ subdomain: subdomain?.toLowerCase() || null })
-      .eq('id', userId)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    await db
+      .prepare('UPDATE users SET subdomain = ? WHERE id = ?')
+      .bind(subdomain?.toLowerCase() || null, userId)
+      .run()
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -159,7 +141,7 @@ export async function PATCH(request: NextRequest) {
     if (!verification.authorized) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
-    const admin = verification.admin
+    const { db } = verification
 
     const { userId, newPassword } = await request.json()
 
@@ -167,11 +149,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Mot de passe trop court' }, { status: 400 })
     }
 
-    const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword })
+    const passwordHash = await hashPassword(newPassword)
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    await db
+      .prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(passwordHash, userId)
+      .run()
 
     return NextResponse.json({ success: true })
   } catch (error) {

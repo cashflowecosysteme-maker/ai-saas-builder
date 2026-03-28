@@ -1,105 +1,60 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse } from 'next/server'
+import { getDB } from '@/lib/db'
+import { verifyPassword, createToken, createSessionCookie } from '@/lib/auth'
 
-// Force dynamic rendering for API routes
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
-/**
- * POST /api/auth/login
- * Login with email and password
- */
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email et mot de passe sont requis' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Email et mot de passe sont requis' }, { status: 400 })
     }
 
-    // Create response object
-    let response = NextResponse.next()
+    const db = await getDB()
 
-    // Create Supabase client with cookie handling for edge runtime
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              request.cookies.set(name, value)
-              response.cookies.set(name, value, options)
-            })
-          },
-        },
-      }
-    )
+    // Find user by email
+    const user = await db
+      .prepare('SELECT id, email, password_hash, full_name, role, affiliate_code FROM users WHERE email = ?')
+      .bind(email.toLowerCase())
+      .first<{ id: string; email: string; password_hash: string; full_name: string | null; role: string; affiliate_code: string }>()
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    if (!user) {
+      return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 })
+    }
+
+    // Verify password
+    const valid = await verifyPassword(password, user.password_hash)
+    if (!valid) {
+      return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 })
+    }
+
+    // Create JWT token
+    const token = await createToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role as 'super_admin' | 'admin' | 'affiliate',
     })
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 401 }
-      )
-    }
-
-    // Get user profile to determine role
-    const admin = createAdminClient() as any
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', data.user.id)
-      .single()
-
-    const role = profile?.role || 'affiliate'
-
-    // Determine redirect URL based on role
-    let redirectUrl = '/dashboard'
-    if (role === 'super_admin') {
-      redirectUrl = '/super-admin'
-    } else if (role === 'admin') {
-      redirectUrl = '/admin'
-    }
-
-    // Return success with user data and set cookies
-    const successResponse = NextResponse.json({
+    // Return success with session cookie
+    const response = NextResponse.json({
       success: true,
       user: {
-        id: data.user.id,
-        email: data.user.email,
-        role,
-        full_name: profile?.full_name,
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        affiliate_code: user.affiliate_code,
       },
-      redirectUrl,
     })
 
-    // Copy cookies from response to successResponse
-    response.cookies.getAll().forEach((cookie) => {
-      successResponse.cookies.set(cookie.name, cookie.value, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-      })
-    })
-
-    return successResponse
-  } catch (error) {
-    console.error('Login error:', error)
+    response.headers.append('Set-Cookie', createSessionCookie(token))
+    return response
+  } catch (error: any) {
+    console.error('Login error:', error?.message || error)
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: 'Erreur serveur: ' + (error?.message || 'Veuillez réessayer.') },
       { status: 500 }
     )
   }

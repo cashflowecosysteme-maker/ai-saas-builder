@@ -1,8 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient, getUserByAffiliateCode } from '@/lib/supabase/admin'
+import { getDB, generateId } from '@/lib/db'
 
-// Force dynamic rendering for API routes
-export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
 /**
@@ -55,24 +54,25 @@ export async function POST(request: NextRequest) {
       console.log('[Systeme.io Webhook] No affiliate code in metadata')
       return NextResponse.json({ success: true, message: 'No affiliate code - sale recorded without commission' })
     }
+
+    const db = await getDB()
     
     // Find the affiliate by code
-    const { user, error: userError } = await getUserByAffiliateCode(affiliateCode)
+    const user = await db
+      .prepare('SELECT * FROM users WHERE affiliate_code = ?')
+      .bind(affiliateCode)
+      .first<any>()
     
-    if (userError || !user) {
+    if (!user) {
       console.log('[Systeme.io Webhook] Affiliate not found for code:', affiliateCode)
       return NextResponse.json({ success: false, error: 'Affiliate not found' }, { status: 404 })
     }
     
-    const admin = createAdminClient() as any
-    
     // Get the affiliate record
-    const { data: affiliate } = await admin
-      .from('affiliates')
-      .select('id, program_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single()
+    const affiliate = await db
+      .prepare('SELECT id, program_id FROM affiliates WHERE user_id = ? AND status = ?')
+      .bind(user.id, 'active')
+      .first<any>()
     
     if (!affiliate) {
       console.log('[Systeme.io Webhook] No active affiliate record for user:', user.id)
@@ -87,28 +87,26 @@ export async function POST(request: NextRequest) {
     }
     
     // Customer info
-    const customerEmail = data.contact?.email
+    const customerEmail = data.contact?.email || null
     const customerName = data.contact?.first_name && data.contact?.last_name
       ? `${data.contact.first_name} ${data.contact.last_name}`
       : data.contact?.first_name || null
     
     // Get program commission rates
-    const { data: program } = await admin
-      .from('programs')
-      .select('commission_l1, commission_l2, commission_l3')
-      .eq('id', affiliate.program_id)
-      .single()
+    const program = await db
+      .prepare('SELECT commission_l1, commission_l2, commission_l3 FROM programs WHERE id = ?')
+      .bind(affiliate.program_id)
+      .first<{ commission_l1: number; commission_l2: number; commission_l3: number }>()
 
     if (!program) {
       return NextResponse.json({ success: false, error: 'Program not found' }, { status: 404 })
     }
 
     // Get affiliate with parent info
-    const { data: affiliateWithParent } = await admin
-      .from('affiliates')
-      .select('id, parent_affiliate_id, grandparent_affiliate_id')
-      .eq('id', affiliate.id)
-      .single()
+    const affiliateWithParent = await db
+      .prepare('SELECT id, parent_affiliate_id, grandparent_affiliate_id FROM affiliates WHERE id = ?')
+      .bind(affiliate.id)
+      .first<{ id: string; parent_affiliate_id: string | null; grandparent_affiliate_id: string | null }>()
 
     // Calculate commissions
     const commissionL1 = (saleAmount * program.commission_l1) / 100
@@ -116,38 +114,38 @@ export async function POST(request: NextRequest) {
     const commissionL3 = (saleAmount * program.commission_l3) / 100
 
     // Create the sale
-    const { data: sale, error: saleError } = await admin
-      .from('sales')
-      .insert({
-        affiliate_id: affiliate.id,
-        program_id: affiliate.program_id,
-        external_order_id: data.id,
-        amount: saleAmount,
-        commission_l1: commissionL1,
-        commission_l2: commissionL2,
-        commission_l3: commissionL3,
-        customer_email: customerEmail,
-        customer_name: customerName,
-        metadata: {
-          systemeio_event: payload.event,
-          product_id: data.product?.id,
-          product_name: data.product?.name,
-        },
-        status: 'pending',
-      })
-      .select()
-      .single()
+    const saleId = generateId()
+    const now = new Date().toISOString()
+    const metadata = JSON.stringify({
+      systemeio_event: payload.event,
+      product_id: data.product?.id,
+      product_name: data.product?.name,
+    })
 
-    if (saleError || !sale) {
-      console.error('[Systeme.io Webhook] Error creating sale:', saleError)
-      return NextResponse.json({ success: false, error: 'Failed to create sale' }, { status: 500 })
-    }
+    await db
+      .prepare('INSERT INTO sales (id, affiliate_id, program_id, external_order_id, amount, commission_l1, commission_l2, commission_l3, customer_email, customer_name, metadata, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(
+        saleId,
+        affiliate.id,
+        affiliate.program_id,
+        data.id,
+        saleAmount,
+        commissionL1,
+        commissionL2,
+        commissionL3,
+        customerEmail,
+        customerName,
+        metadata,
+        'pending',
+        now
+      )
+      .run()
 
     // Create commission records
-    const commissions = []
+    const commissions: Array<{ sale_id: string; affiliate_id: string; level: number; amount: number; status: string }> = []
 
     commissions.push({
-      sale_id: sale.id,
+      sale_id: saleId,
       affiliate_id: affiliate.id,
       level: 1,
       amount: commissionL1,
@@ -156,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     if (affiliateWithParent?.parent_affiliate_id) {
       commissions.push({
-        sale_id: sale.id,
+        sale_id: saleId,
         affiliate_id: affiliateWithParent.parent_affiliate_id,
         level: 2,
         amount: commissionL2,
@@ -166,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     if (affiliateWithParent?.grandparent_affiliate_id) {
       commissions.push({
-        sale_id: sale.id,
+        sale_id: saleId,
         affiliate_id: affiliateWithParent.grandparent_affiliate_id,
         level: 3,
         amount: commissionL3,
@@ -174,20 +172,20 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const { error: commissionsError } = await admin
-      .from('commissions')
-      .insert(commissions)
-
-    if (commissionsError) {
-      console.error('[Systeme.io Webhook] Error creating commissions:', commissionsError)
+    // Insert commission records
+    for (const commission of commissions) {
+      await db
+        .prepare('INSERT INTO commissions (id, sale_id, affiliate_id, level, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(generateId(), commission.sale_id, commission.affiliate_id, commission.level, commission.amount, commission.status, now)
+        .run()
     }
     
-    console.log('[Systeme.io Webhook] Sale created:', sale.id)
+    console.log('[Systeme.io Webhook] Sale created:', saleId)
     console.log('[Systeme.io Webhook] Commissions created:', commissions.length)
     
     return NextResponse.json({
       success: true,
-      sale_id: sale.id,
+      sale_id: saleId,
       commissions_count: commissions.length,
     })
     
