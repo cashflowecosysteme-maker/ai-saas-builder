@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const user = await db
       .prepare('SELECT id, email, password_hash, full_name, role, affiliate_code FROM users WHERE email = ?')
       .bind(email.toLowerCase())
-      .first<{ id: string; email: string; password_hash: string; full_name: string | null; role: string; affiliate_code: string }>()
+      ()
 
     if (!user) {
       return NextResponse.json({ error: 'Email ou mot de passe incorrect' }, { status: 401 })

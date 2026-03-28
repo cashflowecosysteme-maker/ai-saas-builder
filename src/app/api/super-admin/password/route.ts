@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const profile = await db
       .prepare('SELECT role, password_hash FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })

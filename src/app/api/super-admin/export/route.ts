@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const profile = await db
       .prepare('SELECT role FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     if (type === 'users') {
       const usersResult = await db
         .prepare('SELECT email, full_name, role, affiliate_code, paypal_email, subdomain, created_at FROM users ORDER BY created_at DESC')
-        .all<any>()
+        ()
       const users = usersResult.results || []
 
       csv = 'Email,Nom,Rôle,Code Affiliation,PayPal,Sous-domaine,Date inscription\n'
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           JOIN affiliates a ON s.affiliate_id = a.id
           JOIN users u ON a.user_id = u.id
           ORDER BY s.created_at DESC`)
-        .all<any>()
+        ()
       const sales = salesResult.results || []
 
       csv = 'Montant,Statut,Commission L1,Commission L2,Commission L3,Client Email,Affilié,Date\n'

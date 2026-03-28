@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const profile = await db
       .prepare('SELECT role FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       const usersResult = await db
         .prepare('SELECT id FROM users WHERE id != ?')
         .bind(session.userId)
-        .all<{ id: string }>()
+        ()
       const users = usersResult.results || []
 
       if (users.length > 0) {

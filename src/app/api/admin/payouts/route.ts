@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const profile = await db
       .prepare('SELECT role FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const affiliateResult = await db
       .prepare(`SELECT a.id, a.user_id, u.paypal_email, u.email FROM affiliates a JOIN users u ON a.user_id = u.id WHERE a.id = ?`)
       .bind(affiliateId)
-      .first<any>()
+      ()
 
     if (!affiliateResult) {
       return NextResponse.json({ error: 'Affilié non trouvé' }, { status: 404 })

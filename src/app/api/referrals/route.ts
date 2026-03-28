@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const affiliate = await db
       .prepare('SELECT * FROM affiliates WHERE user_id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!affiliate) {
       return NextResponse.json({ error: 'Affilié non trouvé' }, { status: 404 })
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         JOIN users u ON a.user_id = u.id
         WHERE a.parent_affiliate_id = ?`)
       .bind(affiliate.id)
-      .all<any>()
+      ()
     const l1Referrals = (l1Result.results || []).map((r: any) => ({
       id: r.id,
       total_earnings: r.total_earnings,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         JOIN users u ON a.user_id = u.id
         WHERE a.grandparent_affiliate_id = ?`)
       .bind(affiliate.id)
-      .all<any>()
+      ()
     const l2Referrals = (l2Result.results || []).map((r: any) => ({
       id: r.id,
       total_earnings: r.total_earnings,
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
           JOIN users u ON a.user_id = u.id
           WHERE a.parent_affiliate_id IN (${l3Placeholders})`)
         .bind(...l2Ids)
-        .all<any>()
+        ()
       l3Referrals = (l3Result.results || []).map((r: any) => ({
         id: r.id,
         total_earnings: r.total_earnings,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const user = await db
       .prepare('SELECT * FROM users WHERE affiliate_code = ?')
       .bind(code.toUpperCase())
-      .first<any>()
+      ()
 
     if (!user) {
       return NextResponse.json({ error: 'Code de parrainage invalide' }, { status: 404 })
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     const affiliate = await db
       .prepare('SELECT id FROM affiliates WHERE user_id = ? AND status = ?')
       .bind(user.id, 'active')
-      .first<{ id: string }>()
+      ()
 
     if (!affiliate) {
       return NextResponse.json({ error: 'Affilié non actif' }, { status: 404 })

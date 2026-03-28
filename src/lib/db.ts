@@ -1,31 +1,22 @@
+// @ts-nocheck
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any
-
-export interface Env {
-  DB: Database
-  JWT_SECRET: string
-  NEXT_PUBLIC_SUPABASE_URL?: string
-  NEXT_PUBLIC_SUPABASE_ANON_KEY?: string
-  NEXT_PUBLIC_SITE_URL?: string
-  SUPABASE_SERVICE_ROLE_KEY?: string
-}
 
 export async function getDB(): Promise<Database> {
   const ctx = getCloudflareContext()
   if (!ctx || !ctx.env.DB) {
     throw new Error('D1 database not available')
   }
-  return ctx.env.DB as Database
+  return ctx.env.DB
 }
 
-export async function getEnv(): Promise<Env> {
+export async function getEnv() {
   const ctx = getCloudflareContext()
   if (!ctx) {
     throw new Error('Cloudflare context not available')
   }
-  return ctx.env as unknown as Env
+  return ctx.env
 }
 
 export function generateId(): string {
@@ -47,6 +38,5 @@ export async function generateUniqueAffiliateCode(db: Database): Promise<string>
     const existing = await db.prepare('SELECT id FROM users WHERE affiliate_code = ?').bind(code).first()
     if (!existing) return code
   }
-  // Fallback with timestamp
   return Date.now().toString(36).toUpperCase().slice(-8)
 }

@@ -22,25 +22,25 @@ export async function GET(request: NextRequest) {
     const profile = await db
       .prepare('SELECT role FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile || profile.role !== 'super_admin') {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
     // Get global stats
-    const totalUsersResult = await db.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>()
-    const totalAdminsResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").first<{ count: number }>()
-    const totalAffiliatesResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'affiliate'").first<{ count: number }>()
-    const totalSalesResult = await db.prepare('SELECT COUNT(*) as count FROM sales').first<{ count: number }>()
+    const totalUsersResult = await db.prepare('SELECT COUNT(*) as count FROM users')()
+    const totalAdminsResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'")()
+    const totalAffiliatesResult = await db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'affiliate'")()
+    const totalSalesResult = await db.prepare('SELECT COUNT(*) as count FROM sales')()
 
-    const revenueResult = await db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM sales').first<{ total: number }>()
+    const revenueResult = await db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM sales')()
     const totalRevenue = revenueResult?.total || 0
 
-    const pendingResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE status = 'pending'").first<{ total: number }>()
+    const pendingResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE status = 'pending'")()
     const pendingPayouts = pendingResult?.total || 0
 
-    const paidResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payouts WHERE status = 'paid'").first<{ total: number }>()
+    const paidResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM payouts WHERE status = 'paid'")()
     const totalPayouts = paidResult?.total || 0
 
     // Get all admins
@@ -49,11 +49,11 @@ export async function GET(request: NextRequest) {
       adminsResult = await db
         .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at FROM users WHERE role = 'admin' AND (email LIKE ? OR full_name LIKE ?) ORDER BY created_at DESC")
         .bind(`%${search}%`, `%${search}%`)
-        .all<any>()
+        ()
     } else {
       adminsResult = await db
         .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, subdomain, parent_id, created_at FROM users WHERE role = 'admin' ORDER BY created_at DESC")
-        .all<any>()
+        ()
     }
     const admins = adminsResult.results || []
 
@@ -67,12 +67,12 @@ export async function GET(request: NextRequest) {
         level2Result = await db
           .prepare("SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE admin_id = ? AND (email LIKE ? OR full_name LIKE ?)")
           .bind(adminUser.id, `%${search}%`, `%${search}%`)
-          .all<any>()
+          ()
       } else {
         level2Result = await db
           .prepare('SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE admin_id = ?')
           .bind(adminUser.id)
-          .all<any>()
+          ()
       }
       const level2 = level2Result.results || []
 
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         const l3Result = await db
           .prepare('SELECT id, email, full_name, affiliate_code, role, paypal_email, parent_id, created_at FROM users WHERE parent_id = ?')
           .bind(l2.id)
-          .all<any>()
+          ()
         const level3 = l3Result.results || []
 
         level2WithL3.push({
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         JOIN affiliates a ON s.affiliate_id = a.id
         JOIN users u ON a.user_id = u.id
         ORDER BY s.created_at DESC LIMIT 20`)
-      .all<any>()
+      ()
     const recentSales = (recentSalesResult.results || []).map((s: any) => ({
       id: s.id,
       amount: s.amount,
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
           WHERE (m.subject LIKE ? OR m.content LIKE ?)
           ORDER BY m.created_at DESC LIMIT 50`)
         .bind(`%${search}%`, `%${search}%`)
-        .all<any>()
+        ()
     } else {
       messagesResult = await db
         .prepare(`SELECT m.id, m.subject, m.content, m.sender_id, m.recipient_id, m.is_broadcast, m.created_at, m.read_at,
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
           JOIN users su ON m.sender_id = su.id
           JOIN users ru ON m.recipient_id = ru.id
           ORDER BY m.created_at DESC LIMIT 50`)
-        .all<any>()
+        ()
     }
     const messages = (messagesResult.results || []).map((m: any) => ({
       id: m.id,

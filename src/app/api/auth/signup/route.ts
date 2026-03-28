@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       const parent = await db
         .prepare('SELECT id, admin_id FROM users WHERE affiliate_code = ?')
         .bind(referralCode.toUpperCase())
-        .first<{ id: string; admin_id: string | null }>()
+        ()
 
       if (parent) {
         parentId = parent.id
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         const parentAff = await db
           .prepare('SELECT id, parent_affiliate_id FROM affiliates WHERE user_id = ?')
           .bind(parent.id)
-          .first<{ id: string; parent_affiliate_id: string | null }>()
+          ()
 
         if (parentAff) {
           parentAffiliateId = parentAff.id
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     // Create affiliate record if program exists
     const program = await db
       .prepare('SELECT id FROM programs WHERE is_active = 1 LIMIT 1')
-      .first<{ id: string }>()
+      ()
 
     if (program) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliation-pro.cashflowecosysteme.workers.dev'
@@ -105,13 +105,13 @@ export async function POST(request: Request) {
   }
 }
 
-async function findAdminId(db: D1Database, profileId: string): Promise<string | null> {
+async function findAdminId(db: any, profileId: string): Promise<string | null> {
   let currentId = profileId
   for (let i = 0; i < 5; i++) {
     const profile = await db
       .prepare('SELECT id, role, parent_id, admin_id FROM users WHERE id = ?')
       .bind(currentId)
-      .first<{ id: string; role: string; parent_id: string | null; admin_id: string | null }>()
+      ()
     if (!profile) return null
     if (profile.role === 'admin') return profile.id
     if (profile.admin_id) return profile.admin_id

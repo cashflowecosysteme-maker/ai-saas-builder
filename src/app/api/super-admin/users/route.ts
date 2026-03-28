@@ -14,7 +14,7 @@ async function verifySuperAdmin(request: NextRequest) {
   const profile = await db
     .prepare('SELECT role FROM users WHERE id = ?')
     .bind(session.userId)
-    .first<any>()
+    ()
 
   if (!profile || profile.role !== 'super_admin') return { authorized: false }
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       const program = await db
         .prepare('SELECT id FROM programs WHERE is_active = ? LIMIT 1')
         .bind(1)
-        .first<{ id: string }>()
+        ()
       if (program) {
         const affiliateId = generateId()
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://affiliationpro.publication-web.com'

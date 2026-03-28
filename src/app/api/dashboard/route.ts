@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const user = await db
       .prepare('SELECT id, email, full_name, role, affiliate_code, avatar_url, paypal_email FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!user) {
       return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         WHERE a.user_id = ?
       `)
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!affiliate) {
       return NextResponse.json({
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         WHERE a.parent_affiliate_id = ?
       `)
       .bind(affiliate.id)
-      .all<any>()
+      ()
 
     const l1Ids: string[] = []
     for (const m of l1Members.results || []) {
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
         WHERE a.grandparent_affiliate_id = ?
       `)
       .bind(affiliate.id)
-      .all<any>()
+      ()
 
     const l2Ids: string[] = []
     for (const m of l2Members.results || []) {
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
           WHERE a.parent_affiliate_id IN (${placeholders})
         `)
         .bind(...l2Ids)
-        .all<any>()
+        ()
 
       for (const m of l3Members.results || []) {
         team.push({ id: m.id, full_name: m.full_name || 'Nouveau', email: m.email || '', level: 3, created_at: m.created_at })
@@ -126,25 +126,25 @@ export async function GET(request: Request) {
         LIMIT 5
       `)
       .bind(session.userId)
-      .all<any>()
+      ()
 
     // --- STATS ---
     const paidCommissions = await db
       .prepare('SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE affiliate_id = ? AND status = ?')
       .bind(affiliate.id, 'paid')
-      .first<{ total: number }>()
+      ()
     const totalEarnings = paidCommissions?.total || 0
 
     const pendingCommissions = await db
       .prepare('SELECT COALESCE(SUM(amount), 0) as total FROM commissions WHERE affiliate_id = ? AND status = ?')
       .bind(affiliate.id, 'pending')
-      .first<{ total: number }>()
+      ()
     const pendingCommissionsTotal = pendingCommissions?.total || 0
 
     const clickCount = await db
       .prepare('SELECT COUNT(*) as total FROM clicks WHERE affiliate_id = ?')
       .bind(affiliate.id)
-      .first<{ total: number }>()
+      ()
     const totalClicks = clickCount?.total || 0
 
     const l1Count = (l1Members.results || []).length
@@ -155,7 +155,7 @@ export async function GET(request: Request) {
       const l3Result = await db
         .prepare(`SELECT COUNT(*) as total FROM affiliates WHERE parent_affiliate_id IN (${placeholders})`)
         .bind(...l2Ids)
-        .first<{ total: number }>()
+        ()
       l3Count = l3Result?.total || 0
     }
 
@@ -163,7 +163,7 @@ export async function GET(request: Request) {
     const recentSales = await db
       .prepare('SELECT id, amount, status, created_at, commission_l1, customer_email FROM sales WHERE affiliate_id = ? ORDER BY created_at DESC LIMIT 10')
       .bind(affiliate.id)
-      .all<any>()
+      ()
 
     // Weekly sales
     const sevenDaysAgo = new Date()
@@ -171,7 +171,7 @@ export async function GET(request: Request) {
     const weeklySalesData = await db
       .prepare('SELECT amount, created_at FROM sales WHERE affiliate_id = ? AND created_at >= ?')
       .bind(affiliate.id, sevenDaysAgo.toISOString())
-      .all<any>()
+      ()
 
     const weeklySales: { date: string; total: number; count: number }[] = []
     const salesByDay: Record<string, { total: number; count: number }> = {}

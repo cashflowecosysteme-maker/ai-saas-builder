@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const profile = await db
       .prepare('SELECT id, email, full_name, paypal_email, affiliate_code, role, subdomain, admin_id FROM users WHERE id = ?')
       .bind(session.userId)
-      .first<any>()
+      ()
 
     if (!profile) {
       return NextResponse.json({ error: 'Profil non trouvé' }, { status: 404 })
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const teamMembersResult = await db
       .prepare('SELECT id, email, full_name, paypal_email, affiliate_code, role, created_at, admin_id FROM users WHERE admin_id = ? AND role = ? ORDER BY created_at DESC')
       .bind(session.userId, 'affiliate')
-      .all<any>()
+      ()
 
     const teamMembers = teamMembersResult.results || []
 
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       const affiliateResult = await db
         .prepare(`SELECT id, user_id, status, total_earnings, total_referrals FROM affiliates WHERE user_id IN (${placeholders})`)
         .bind(...memberIds)
-        .all<any>()
+        ()
       affiliateRecords = affiliateResult.results || []
     }
 
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       const l3Result = await db
         .prepare(`SELECT id, email, full_name, affiliate_code, role, created_at, parent_id, admin_id FROM users WHERE parent_id IN (${l3Placeholders})`)
         .bind(...memberIds)
-        .all<any>()
+        ()
       level3Members = l3Result.results || []
     }
 
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       const salesResult = await db
         .prepare(`SELECT amount FROM sales WHERE affiliate_id IN (${salesPlaceholders})`)
         .bind(...affiliateIds)
-        .all<any>()
+        ()
       const sales = salesResult.results || []
       totalSales = sales.length
       totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.amount), 0)
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       const pendingCommissionsResult = await db
         .prepare(`SELECT amount FROM commissions WHERE affiliate_id IN (${salesPlaceholders}) AND status = ?`)
         .bind(...affiliateIds, 'pending')
-        .all<any>()
+        ()
       const pendingCommissions = pendingCommissionsResult.results || []
       pendingPayouts = pendingCommissions.reduce((sum: number, c: any) => sum + Number(c.amount), 0)
     }
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     const paidPayoutsResult = await db
       .prepare('SELECT amount FROM payouts WHERE admin_id = ? AND status = ?')
       .bind(session.userId, 'paid')
-      .all<any>()
+      ()
     const paidPayoutsTotal = (paidPayoutsResult.results || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
 
     // Get pending commissions with affiliate details for payouts
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       const pcResult = await db
         .prepare(`SELECT c.affiliate_id, c.amount, u.id as user_id, u.full_name, u.email, u.paypal_email FROM commissions c JOIN affiliates a ON c.affiliate_id = a.id JOIN users u ON a.user_id = u.id WHERE c.affiliate_id IN (${pcPlaceholders}) AND c.status = ?`)
         .bind(...affiliateIds, 'pending')
-        .all<any>()
+        ()
       pendingCommissions = pcResult.results || []
     }
 
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
       const rsResult = await db
         .prepare(`SELECT id, amount, status, created_at, commission_l1, customer_email FROM sales WHERE affiliate_id IN (${rsPlaceholders}) ORDER BY created_at DESC LIMIT 20`)
         .bind(...affiliateIds)
-        .all<any>()
+        ()
       recentSales = rsResult.results || []
     }
 

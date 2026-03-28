@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const user = await db
       .prepare('SELECT * FROM users WHERE affiliate_code = ?')
       .bind(affiliateCode)
-      .first<any>()
+      ()
     
     if (!user) {
       console.log('[Systeme.io Webhook] Affiliate not found for code:', affiliateCode)
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const affiliate = await db
       .prepare('SELECT id, program_id FROM affiliates WHERE user_id = ? AND status = ?')
       .bind(user.id, 'active')
-      .first<any>()
+      ()
     
     if (!affiliate) {
       console.log('[Systeme.io Webhook] No active affiliate record for user:', user.id)
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     const program = await db
       .prepare('SELECT commission_l1, commission_l2, commission_l3 FROM programs WHERE id = ?')
       .bind(affiliate.program_id)
-      .first<{ commission_l1: number; commission_l2: number; commission_l3: number }>()
+      ()
 
     if (!program) {
       return NextResponse.json({ success: false, error: 'Program not found' }, { status: 404 })
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     const affiliateWithParent = await db
       .prepare('SELECT id, parent_affiliate_id, grandparent_affiliate_id FROM affiliates WHERE id = ?')
       .bind(affiliate.id)
-      .first<{ id: string; parent_affiliate_id: string | null; grandparent_affiliate_id: string | null }>()
+      ()
 
     // Calculate commissions
     const commissionL1 = (saleAmount * program.commission_l1) / 100
