@@ -29,10 +29,31 @@ import {
   CreditCard,
   Wallet,
   LogOut,
+  MessageSquare,
+  Facebook, // Nouveau
+  Mail, // Nouveau
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import type { Profile, Affiliate, Sale } from '@/types/database'
+
+// Nouvelle interface pour les membres de l'équipe
+interface TeamMember {
+  id: string
+  full_name: string | null
+  email: string
+  level: number
+  created_at: string
+}
+
+// Nouvelle interface pour les messages
+interface AdminMessage {
+  id: string
+  subject: string
+  content: string
+  created_at: string
+  read: boolean
+}
 
 interface DashboardStats {
   totalEarnings: number
@@ -51,6 +72,8 @@ interface DashboardData {
   stats: DashboardStats
   parentInfo: { full_name: string | null; email: string } | null
   isAdmin?: boolean
+  team?: TeamMember[] // Ajout équipe
+  messages?: AdminMessage[] // Ajout messages
 }
 
 export default function DashboardPage() {
@@ -145,15 +168,30 @@ export default function DashboardPage() {
     })
   }
 
+  // Fonction de partage universelle (Mobile & Desktop)
+  const handleNativeShare = () => {
+    const link = data?.affiliate?.affiliate_link || `${window.location.origin}/r/${data?.profile?.affiliate_code}`
+    const shareData = {
+      title: 'AffiliationPro',
+      text: 'Rejoignez mon équipe et gagnez de l\'argent !',
+      url: link,
+    }
+    if (navigator.share) {
+      navigator.share(shareData)
+        .then(() => toast.success('Partagé avec succès !'))
+        .catch(() => toast.info('Partage annulé'))
+    } else {
+      // Fallback pour desktop si pas de native share
+      copyLink()
+      toast.info('Lien copié ! Vous pouvez le coller sur Instagram ou TikTok.')
+    }
+  }
 
-
-  // Get day name from date
   const getDayName = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('fr-FR', { weekday: 'short' })
   }
 
-  // Calculate max for chart
   const maxWeeklyTotal = Math.max(...(data?.stats.weeklySales.map(s => s.total) || [1]), 1)
 
   if (isLoading) {
@@ -184,7 +222,7 @@ export default function DashboardPage() {
     )
   }
 
-  const { profile, affiliate, stats } = data
+  const { profile, affiliate, stats, team = [], messages = [] } = data
   const referralLink = affiliate?.affiliate_link || `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${profile.affiliate_code}`
   const totalReferrals = stats.l1Referrals + stats.l2Referrals + stats.l3Referrals
 
@@ -211,7 +249,7 @@ export default function DashboardPage() {
             onClick={() => setShowSettings(!showSettings)}
           >
             <Settings className="w-4 h-4 mr-2" />
-            Paramètres
+            Paramètres PayPal
           </Button>
           <div className="hidden md:block text-right">
             <p className="text-sm text-white font-medium">{profile.full_name || 'Affilié'}</p>
@@ -271,6 +309,7 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="relative z-10 px-6 py-8 md:px-12 lg:px-24">
         <div className="max-w-6xl mx-auto">
+          
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">
@@ -281,9 +320,28 @@ export default function DashboardPage() {
             </p>
           </div>
 
+          {/* MESSAGES DU SUPER ADMIN - Nouvelle Section */}
+          {messages.length > 0 && (
+            <Card className="glass-card mb-8 border-blue-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                  Messages de l'Administration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`p-3 rounded-lg ${msg.read ? 'bg-white/5' : 'bg-blue-500/10 border border-blue-500/20'}`}>
+                    <p className="text-sm text-zinc-300">{msg.content}</p>
+                    <p className="text-xs text-zinc-500 mt-1">{formatDate(msg.created_at)}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Referral Link - Parrainer Section */}
           <Card className="glass-card mb-8 border-green-500/30 overflow-hidden relative">
-            {/* Decorative gradient */}
             <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-transparent to-emerald-500/10" />
             <CardContent className="p-6 relative">
               <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
@@ -317,17 +375,26 @@ export default function DashboardPage() {
                       {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>
+                  
+                  {/* NOUVEAUX BOUTONS DE PARTAGE */}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 border-purple-500/20 text-zinc-300 hover:text-white hover:bg-purple-500/10"
-                      onClick={() => {
-                        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent("Rejoignez le programme d'affiliation AffiliationPro! ")}&url=${encodeURIComponent(referralLink)}`, '_blank')
-                      }}
+                      className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                      onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Partager
+                      <Facebook className="w-4 h-4 mr-1" />
+                      Facebook
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-pink-500/30 text-pink-400 hover:bg-pink-500/10"
+                      onClick={handleNativeShare}
+                    >
+                      <Share2 className="w-4 h-4 mr-1" />
+                      Insta/TikTok
                     </Button>
                     <Button
                       variant="outline"
@@ -338,7 +405,7 @@ export default function DashboardPage() {
                         toast.success('Message copié !')
                       }}
                     >
-                      <UserPlus className="w-4 h-4 mr-2" />
+                      <UserPlus className="w-4 h-4 mr-1" />
                       Inviter
                     </Button>
                   </div>
@@ -401,9 +468,59 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {/* NOUVELLE SECTION : MON ÉQUIPE */}
+          <Card className="glass-card border-0 mb-8">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-400" />
+                Mon Équipe (Détails)
+              </CardTitle>
+              <CardDescription>Liste de vos filleuls et leurs coordonnées</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {team.length === 0 ? (
+                <div className="text-center py-8 text-zinc-500">
+                  <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p>Vous n'avez pas encore de filleuls directs.</p>
+                  <p className="text-sm">Partagez votre lien pour recruter !</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-purple-500/10">
+                        <th className="text-left text-xs text-zinc-500 font-medium pb-3">Nom</th>
+                        <th className="text-left text-xs text-zinc-500 font-medium pb-3">Email</th>
+                        <th className="text-center text-xs text-zinc-500 font-medium pb-3">Niveau</th>
+                        <th className="text-left text-xs text-zinc-500 font-medium pb-3">Date d'inscription</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-500/5">
+                      {team.map((member) => (
+                        <tr key={member.id} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 text-zinc-300">{member.full_name || 'Nouveau'}</td>
+                          <td className="py-3 text-zinc-400">{member.email}</td>
+                          <td className="py-3 text-center">
+                            <Badge variant="outline" className={
+                              member.level === 1 ? 'border-purple-500 text-purple-300' :
+                              member.level === 2 ? 'border-blue-500 text-blue-300' :
+                              'border-green-500 text-green-300'
+                            }>
+                              Niveau {member.level}
+                            </Badge>
+                          </td>
+                          <td className="py-3 text-zinc-500 text-sm">{formatDate(member.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Chart and Commission Levels */}
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
-            {/* Weekly Sales Chart */}
             <Card className="glass-card border-0 lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-white flex items-center gap-2">
@@ -438,7 +555,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Commission Levels */}
             <Card className="glass-card border-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-white flex items-center gap-2">
